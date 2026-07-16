@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Production build
+dist/
+
+# Local/secrets folder (contains private skills, credentials, etc.)
+_secrets/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvsca
+*.njsproj
+*.sln
+*.sw?
