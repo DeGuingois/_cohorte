@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import adaAvatar from './ada.png';
-import bobbAvatar from './bobb.png';
-import kiraAvatar from './kira.png';
+import adaAvatar from './avatars/ada.png';
+import bobbAvatar from './avatars/bobb.png';
+import eliAvatar from './avatars/eli.png';
+import kiraAvatar from './avatars/kira.png';
+import miloAvatar from './avatars/milo.png';
+import zoeAvatar from './avatars/zoe.png';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
 
 const avatars = {
   ada: adaAvatar,
   bobb: bobbAvatar,
+  eli: eliAvatar,
   kira: kiraAvatar,
+  milo: miloAvatar,
+  zoe: zoeAvatar,
 };
 
 function formatModified(value) {

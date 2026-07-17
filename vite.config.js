@@ -32,6 +32,11 @@ function slug(value) {
     .replace(/^-+|-+$/g, '') || 'vault';
 }
 
+function vaultAvatar(name) {
+  const normalized = slug(name);
+  return ['ada', 'bobb', 'eli', 'kira', 'milo', 'zoe'].find((avatar) => normalized.includes(avatar)) || 'ada';
+}
+
 function safeResolve(base, relativePath = '') {
   const resolved = path.resolve(base, relativePath);
   if (!resolved.toLowerCase().startsWith(path.resolve(base).toLowerCase())) {
@@ -122,7 +127,7 @@ function getVaults() {
         id: slug(entry.name),
         name: entry.name,
         path: vaultPath,
-        avatar: entry.name.toLowerCase().includes('bobb') ? 'bobb' : (entry.name.toLowerCase().includes('kira') ? 'kira' : 'ada'),
+        avatar: vaultAvatar(entry.name),
         notes: files.length,
         files,
         tree: buildTree(files),
