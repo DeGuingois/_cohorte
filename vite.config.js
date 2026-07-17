@@ -122,7 +122,7 @@ function getVaults() {
         id: slug(entry.name),
         name: entry.name,
         path: vaultPath,
-        avatar: entry.name.toLowerCase().includes('bobb') ? 'bobb' : 'ada',
+        avatar: entry.name.toLowerCase().includes('bobb') ? 'bobb' : (entry.name.toLowerCase().includes('kira') ? 'kira' : 'ada'),
         notes: files.length,
         files,
         tree: buildTree(files),

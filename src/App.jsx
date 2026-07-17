@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import adaAvatar from './ada.png';
 import bobbAvatar from './bobb.png';
+import kiraAvatar from './kira.png';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
 
 const avatars = {
   ada: adaAvatar,
   bobb: bobbAvatar,
+  kira: kiraAvatar,
 };
 
 function formatModified(value) {
@@ -522,7 +524,7 @@ function collectFolderPaths(nodes, paths = []) {
   return paths;
 }
 
-function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, openFolders, onToggleFolder }) {
+function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, openFolders, onToggleFolder, onResizeStart, isResizing }) {
   const tree = useMemo(() => filterTree(vault?.tree || [], query), [vault, query]);
   const visibleFolders = query.trim() ? new Set(collectFolderPaths(tree)) : openFolders;
 
@@ -551,11 +553,15 @@ function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, ope
           />
         ))}
       </div>
+      <div
+        className={`resize-handle ${isResizing ? 'is-resizing' : ''}`}
+        onMouseDown={onResizeStart}
+      />
     </aside>
   );
 }
 
-function FlatFileSearch({ vault, activePath, query, onQueryChange, onOpenFile }) {
+function FlatFileSearch({ vault, activePath, query, onQueryChange, onOpenFile, onResizeStart, isResizing }) {
   const files = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...(vault?.files || [])].sort((a, b) => a.path.localeCompare(b.path)).filter((file) => {
@@ -588,6 +594,10 @@ function FlatFileSearch({ vault, activePath, query, onQueryChange, onOpenFile })
           </button>
         ))}
       </div>
+      <div
+        className={`resize-handle ${isResizing ? 'is-resizing' : ''}`}
+        onMouseDown={onResizeStart}
+      />
     </aside>
   );
 }
@@ -710,6 +720,39 @@ export default function App() {
   const [openFoldersByVault, setOpenFoldersByVault] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [filePaneWidth, setFilePaneWidth] = useState(() => {
+    const saved = localStorage.getItem('file-pane-width');
+    return saved ? parseInt(saved, 10) : 286;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e) => {
+      const railWidth = window.innerWidth <= 1100 ? 88 : 96;
+      const newWidth = Math.max(180, Math.min(600, e.clientX - railWidth));
+      setFilePaneWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (!isResizing) {
+      localStorage.setItem('file-pane-width', filePaneWidth.toString());
+    }
+  }, [isResizing, filePaneWidth]);
 
   const activeVault = vaults.find((vault) => vault.id === activeVaultId);
   const activeFile = activeVault?.files.find((file) => file.path === activePath);
@@ -806,7 +849,7 @@ export default function App() {
 
   useEffect(() => {
     openNote(activeVaultId, activePath).catch((err) => setError(err.message));
-  }, [activeVaultId, activePath]);
+  }, [activeVaultId, activePath, vaults]);
 
   useEffect(() => {
     if (!activeVaultId) {
@@ -819,7 +862,7 @@ export default function App() {
       if (err.name !== 'AbortError') setError(err.message);
     });
     return () => controller.abort();
-  }, [activeVaultId]);
+  }, [activeVaultId, vaults]);
 
   useEffect(() => {
     const onKey = (event) => {
@@ -833,7 +876,7 @@ export default function App() {
   }, [activeVault, activePath, content]);
 
   return (
-    <div className="obsidian-shell">
+    <div className="obsidian-shell" style={{ '--file-pane-width': `${filePaneWidth}px` }}>
       <VaultRail vaults={vaults} activeVault={activeVault} onSelectVault={selectVault} />
       <FileExplorer
         vault={activeVault}
@@ -843,6 +886,8 @@ export default function App() {
         onOpenFile={setActivePath}
         openFolders={currentOpenFolders}
         onToggleFolder={toggleFolder}
+        onResizeStart={() => setIsResizing(true)}
+        isResizing={isResizing}
       />
       <div className="main-column">
         <header className="top-bar">
