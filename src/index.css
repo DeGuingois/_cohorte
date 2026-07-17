@@ -94,6 +94,11 @@ button {
   box-shadow: 3px 3px 0 rgba(239,68,68,.16);
 }
 
+.vault-avatar.is-dragging {
+  opacity: 0.42;
+  transform: scale(0.96);
+}
+
 .vault-avatar img {
   width: 100%;
   height: 100%;

@@ -17,6 +17,17 @@ const avatars = {
   zoe: zoeAvatar,
 };
 
+const VAULT_ORDER_KEY = 'vault-order';
+
+function readStoredVaultOrder() {
+  try {
+    const value = JSON.parse(localStorage.getItem(VAULT_ORDER_KEY) || '[]');
+    return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function formatModified(value) {
   return new Intl.DateTimeFormat('fr-FR', {
     day: '2-digit',
@@ -455,14 +466,37 @@ function MarkdownBodyEditor({ body, onChange, activeVault, onOpenFile, onTag }) 
   );
 }
 
-function VaultRail({ vaults, activeVault, onSelectVault }) {
+function VaultRail({ vaults, activeVault, onSelectVault, onReorderVaults }) {
+  const [draggingVaultId, setDraggingVaultId] = useState('');
+
+  function dropVault(event, targetVaultId) {
+    event.preventDefault();
+    const sourceVaultId = event.dataTransfer.getData('text/plain') || draggingVaultId;
+    setDraggingVaultId('');
+    if (!sourceVaultId || sourceVaultId === targetVaultId) return;
+    onReorderVaults(sourceVaultId, targetVaultId);
+  }
+
   return (
     <nav className="vault-rail" aria-label="Vaults">
       {vaults.map((vault) => (
         <button
           key={vault.id}
-          className={`vault-avatar ${activeVault?.id === vault.id ? 'is-active' : ''}`}
+          className={`vault-avatar ${activeVault?.id === vault.id ? 'is-active' : ''} ${draggingVaultId === vault.id ? 'is-dragging' : ''}`}
+          draggable
+          aria-grabbed={draggingVaultId === vault.id}
           onClick={() => onSelectVault(vault)}
+          onDragStart={(event) => {
+            setDraggingVaultId(vault.id);
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', vault.id);
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(event) => dropVault(event, vault.id)}
+          onDragEnd={() => setDraggingVaultId('')}
           title={vault.name}
         >
           <img src={avatars[vault.avatar] || adaAvatar} alt="" />
@@ -724,6 +758,7 @@ export default function App() {
   const [view, setView] = useState('note');
   const [graph, setGraph] = useState(null);
   const [openFoldersByVault, setOpenFoldersByVault] = useState({});
+  const [vaultOrder, setVaultOrder] = useState(readStoredVaultOrder);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filePaneWidth, setFilePaneWidth] = useState(() => {
@@ -767,6 +802,13 @@ export default function App() {
   const defaultOpenFolders = useMemo(() => [], [activeVaultId]);
   const currentOpenFolders = new Set(openFoldersByVault[activeVaultId] || defaultOpenFolders);
   const foldersExpanded = allFolderPaths.length > 0 && allFolderPaths.every((folderPath) => currentOpenFolders.has(folderPath));
+  const orderedVaults = useMemo(() => {
+    const byId = new Map(vaults.map((vault) => [vault.id, vault]));
+    const orderedIds = vaultOrder.filter((vaultId) => byId.has(vaultId));
+    const knownIds = new Set(orderedIds);
+    const missingIds = vaults.map((vault) => vault.id).filter((vaultId) => !knownIds.has(vaultId));
+    return [...orderedIds, ...missingIds].map((vaultId) => byId.get(vaultId)).filter(Boolean);
+  }, [vaults, vaultOrder]);
 
   async function refreshVaults(nextVaultId = activeVaultId, nextPath = activePath) {
     const response = await fetch('/api/vaults');
@@ -831,6 +873,19 @@ export default function App() {
     setQuery('');
   }
 
+  function reorderVaults(sourceVaultId, targetVaultId) {
+    setVaultOrder((currentOrder) => {
+      const currentIds = currentOrder.length ? currentOrder : vaults.map((vault) => vault.id);
+      const availableIds = new Set(vaults.map((vault) => vault.id));
+      const nextOrder = currentIds.filter((vaultId) => availableIds.has(vaultId) && vaultId !== sourceVaultId);
+      const targetIndex = nextOrder.indexOf(targetVaultId);
+      if (targetIndex === -1) return currentOrder;
+      nextOrder.splice(targetIndex, 0, sourceVaultId);
+      localStorage.setItem(VAULT_ORDER_KEY, JSON.stringify(nextOrder));
+      return nextOrder;
+    });
+  }
+
   function toggleFolder(folderPath) {
     if (!activeVault) return;
     setOpenFoldersByVault((current) => {
@@ -883,7 +938,7 @@ export default function App() {
 
   return (
     <div className="obsidian-shell" style={{ '--file-pane-width': `${filePaneWidth}px` }}>
-      <VaultRail vaults={vaults} activeVault={activeVault} onSelectVault={selectVault} />
+      <VaultRail vaults={orderedVaults} activeVault={activeVault} onSelectVault={selectVault} onReorderVaults={reorderVaults} />
       <FileExplorer
         vault={activeVault}
         activePath={activePath}
