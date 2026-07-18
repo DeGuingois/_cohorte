@@ -747,6 +747,105 @@ function MarkdownEditor({ note, content, setContent, saving, dirty, onSave, acti
   );
 }
 
+function GearIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function OptionsModal({ currentRoot, onClose, onSaved }) {
+  const [inputValue, setInputValue] = useState(currentRoot);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  async function handleSave(event) {
+    event.preventDefault();
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    setError('');
+    setSuccess(false);
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vaultsRoot: trimmed }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur lors de la sauvegarde');
+      setSuccess(true);
+      await onSaved();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleBackdropClick(event) {
+    if (event.target === event.currentTarget) onClose();
+  }
+
+  return (
+    <div className="options-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-label="Options">
+      <div className="options-modal">
+        <div className="options-modal-header">
+          <div className="options-modal-title">
+            <GearIcon />
+            <span>Options</span>
+          </div>
+          <button className="options-close" onClick={onClose} aria-label="Fermer">&times;</button>
+        </div>
+        <div className="options-modal-body">
+          <form onSubmit={handleSave}>
+            <fieldset className="options-fieldset">
+              <legend className="options-legend">Répertoire des vaults</legend>
+              <p className="options-description">
+                Chemin absolu vers le dossier contenant vos vaults Obsidian.
+                Chaque sous-dossier sera traité comme un vault distinct.
+              </p>
+              <label className="options-label" htmlFor="vaults-root-input">
+                <FolderIcon />
+                <span>Chemin du répertoire</span>
+              </label>
+              <input
+                id="vaults-root-input"
+                className="options-input"
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ex: C:\Users\Vous\Documents\mes-vaults"
+                autoComplete="off"
+                spellCheck="false"
+              />
+              {error && <p className="options-error">{error}</p>}
+              {success && <p className="options-success">✓ Répertoire mis à jour — vaults rechargés.</p>}
+            </fieldset>
+            <div className="options-modal-footer">
+              <button type="button" className="options-btn options-btn--secondary" onClick={onClose}>Annuler</button>
+              <button type="submit" className="options-btn options-btn--primary" disabled={saving || !inputValue.trim()}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [vaults, setVaults] = useState([]);
   const [root, setRoot] = useState('');
@@ -761,6 +860,7 @@ export default function App() {
   const [vaultOrder, setVaultOrder] = useState(readStoredVaultOrder);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [filePaneWidth, setFilePaneWidth] = useState(() => {
     const saved = localStorage.getItem('file-pane-width');
     return saved ? parseInt(saved, 10) : 286;
@@ -967,6 +1067,15 @@ export default function App() {
               {error && <span className="error-text">{error}</span>}
               <button className={view === 'note' ? 'is-selected' : ''} onClick={() => setView('note')}>Note</button>
               <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>
+              <button
+                id="settings-btn"
+                className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`}
+                aria-label="Options"
+                title="Options"
+                onClick={() => setOptionsOpen(true)}
+              >
+                <GearIcon />
+              </button>
             </div>
           </div>
         </header>
@@ -986,6 +1095,15 @@ export default function App() {
           />
         )}
       </div>
+      {optionsOpen && (
+        <OptionsModal
+          currentRoot={root}
+          onClose={() => setOptionsOpen(false)}
+          onSaved={async () => {
+            await refreshVaults();
+          }}
+        />
+      )}
     </div>
   );
 }

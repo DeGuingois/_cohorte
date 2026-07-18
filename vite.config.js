@@ -4,7 +4,26 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { buildGraphData } from './src/graphData.js';
 
-const vaultsRoot = process.env.VAULTS_ROOT || 'C:\\Users\\s.travers\\Documents\\_projet_perso\\agents_vaults';
+const SETTINGS_FILE = path.resolve('./settings.json');
+const DEFAULT_VAULTS_ROOT = process.env.VAULTS_ROOT || 'C:\\Users\\s.travers\\Documents\\_projet_perso\\agents_vaults';
+
+function readSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      return { vaultsRoot: data.vaultsRoot || DEFAULT_VAULTS_ROOT };
+    }
+  } catch { /* ignore */ }
+  return { vaultsRoot: DEFAULT_VAULTS_ROOT };
+}
+
+function writeSettings(settings) {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function getVaultsRoot() {
+  return readSettings().vaultsRoot;
+}
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -117,6 +136,7 @@ function noteTitle(content, fallback) {
 }
 
 function getVaults() {
+  const vaultsRoot = getVaultsRoot();
   if (!fs.existsSync(vaultsRoot)) return [];
   return fs.readdirSync(vaultsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name !== '.git')
@@ -142,6 +162,7 @@ function findVault(vaultId) {
   return vault;
 }
 
+
 function getGraph(vaultId) {
   const vault = findVault(vaultId);
   const files = walkMarkdown(vault.path).sort((a, b) => a.path.localeCompare(b.path));
@@ -156,9 +177,31 @@ function obsidianLocalApi() {
   return {
     name: 'obsidian-local-api',
     configureServer(server) {
+      server.middlewares.use('/api/settings', async (req, res) => {
+        try {
+          if (req.method === 'GET') {
+            sendJson(res, 200, readSettings());
+            return;
+          }
+          if (req.method === 'POST') {
+            const body = await readBody(req);
+            if (typeof body.vaultsRoot !== 'string' || !body.vaultsRoot.trim()) {
+              sendJson(res, 400, { error: 'Invalid vaultsRoot' });
+              return;
+            }
+            writeSettings({ vaultsRoot: body.vaultsRoot.trim() });
+            sendJson(res, 200, { ok: true, vaultsRoot: body.vaultsRoot.trim() });
+            return;
+          }
+          sendJson(res, 405, { error: 'Method not allowed' });
+        } catch (error) {
+          sendJson(res, 500, { error: error.message });
+        }
+      });
+
       server.middlewares.use('/api/vaults', (req, res) => {
         try {
-          sendJson(res, 200, { root: vaultsRoot, vaults: getVaults() });
+          sendJson(res, 200, { root: getVaultsRoot(), vaults: getVaults() });
         } catch (error) {
           sendJson(res, 500, { error: error.message });
         }
