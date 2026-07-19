@@ -3,6 +3,7 @@ node_modules/
 
 # Production build
 dist/
+out/
 
 # Local/secrets folders (contains private skills, credentials, audit reports, etc.)
 _secrets/

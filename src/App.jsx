@@ -7,6 +7,7 @@ import miloAvatar from './avatars/milo.png';
 import zoeAvatar from './avatars/zoe.png';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
+import TerminalPanel from './TerminalPanel.jsx';
 
 const avatars = {
   ada: adaAvatar,
@@ -778,13 +779,8 @@ function OptionsModal({ currentRoot, onClose, onSaved }) {
     setError('');
     setSuccess(false);
     try {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vaultsRoot: trimmed }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Erreur lors de la sauvegarde');
+      const data = await window.electronAPI.saveSettings(trimmed);
+      if (!data.ok) throw new Error(data.error || 'Erreur lors de la sauvegarde');
       setSuccess(true);
       await onSaved();
     } catch (err) {
@@ -820,16 +816,26 @@ function OptionsModal({ currentRoot, onClose, onSaved }) {
                 <FolderIcon />
                 <span>Chemin du répertoire</span>
               </label>
-              <input
-                id="vaults-root-input"
-                className="options-input"
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ex: C:\Users\Vous\Documents\mes-vaults"
-                autoComplete="off"
-                spellCheck="false"
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  id="vaults-root-input"
+                  className="options-input"
+                  type="text"
+                  value={inputValue}
+                  readOnly
+                  placeholder="Ex: C:\Users\Vous\Documents\mes-vaults"
+                />
+                <button 
+                  type="button" 
+                  className="options-btn options-btn--secondary" 
+                  onClick={async () => {
+                    const dir = await window.electronAPI.pickDirectory();
+                    if (dir) setInputValue(dir);
+                  }}
+                >
+                  Parcourir
+                </button>
+              </div>
               {error && <p className="options-error">{error}</p>}
               {success && <p className="options-success">✓ Répertoire mis à jour — vaults rechargés.</p>}
             </fieldset>
@@ -866,6 +872,8 @@ export default function App() {
     return saved ? parseInt(saved, 10) : 286;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [terminalVisible, setTerminalVisible] = useState(false);
+  const [terminalCommand, setTerminalCommand] = useState('');
 
   useEffect(() => {
     if (!isResizing) return;
@@ -911,9 +919,7 @@ export default function App() {
   }, [vaults, vaultOrder]);
 
   async function refreshVaults(nextVaultId = activeVaultId, nextPath = activePath) {
-    const response = await fetch('/api/vaults');
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Cannot load vaults');
+    const data = await window.electronAPI.getVaults();
     setRoot(data.root);
     setVaults(data.vaults);
 
@@ -927,18 +933,14 @@ export default function App() {
 
   async function openNote(vaultId, pathValue) {
     if (!vaultId || !pathValue) return;
-    const response = await fetch(`/api/note?vaultId=${encodeURIComponent(vaultId)}&path=${encodeURIComponent(pathValue)}`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Cannot load note');
+    const data = await window.electronAPI.getNote(vaultId, pathValue);
     setContent(data.content);
     setLastSaved(data.content);
   }
 
   async function loadGraph(vaultId, signal) {
     if (!vaultId) return;
-    const response = await fetch(`/api/graph?vaultId=${encodeURIComponent(vaultId)}`, { signal });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Cannot load graph');
+    const data = await window.electronAPI.getGraph(vaultId);
     if (signal?.aborted || data.vaultId !== vaultId) return;
     setGraph(data);
   }
@@ -948,13 +950,8 @@ export default function App() {
     setSaving(true);
     setError('');
     try {
-      const response = await fetch('/api/note', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vaultId: activeVault.id, path: activePath, content }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Cannot save note');
+      const data = await window.electronAPI.saveNote(activeVault.id, activePath, content);
+      if (!data.ok) throw new Error(data.error || 'Cannot save note');
       setLastSaved(content);
       await refreshVaults(activeVault.id, activePath);
       await openNote(activeVault.id, activePath);
@@ -1055,8 +1052,8 @@ export default function App() {
           <nav className="top-menu" aria-label="Workspace menu">
             <button className={view === 'graph' ? 'is-selected' : ''} onClick={() => setView('graph')}>Synapse</button>
             <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Deplier dossiers'}</button>
-            <button type="button">Codex</button>
-            <button type="button">Gemini</button>
+            <button type="button" onClick={() => { setTerminalCommand('codex'); setTerminalVisible(true); }}>Codex</button>
+            <button type="button" onClick={() => { setTerminalCommand('agy'); setTerminalVisible(true); }}>Gemini</button>
           </nav>
           <div className="top-title-row">
             <div className="top-title">
@@ -1094,6 +1091,12 @@ export default function App() {
             onTag={(tag) => setQuery(tag)}
           />
         )}
+        <TerminalPanel 
+          activeVaultId={activeVaultId} 
+          isVisible={terminalVisible} 
+          onClose={() => setTerminalVisible(false)} 
+          initialCommand={terminalCommand} 
+        />
       </div>
       {optionsOpen && (
         <OptionsModal

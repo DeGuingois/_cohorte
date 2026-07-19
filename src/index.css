@@ -2433,3 +2433,104 @@ button {
   cursor: not-allowed;
 }
 
+/* ─── Terminal panel ────────────────────────────────────────────────────────── */
+
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  background: #1a1b26;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.terminal-resize-handle {
+  height: 5px;
+  cursor: ns-resize;
+  background: transparent;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.terminal-resize-handle:hover,
+.terminal-resize-handle.is-resizing {
+  background: var(--theme-primary);
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: #16161e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.terminal-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: 'Share Tech Mono', monospace;
+  color: rgba(192, 202, 245, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.terminal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--theme-primary);
+  flex-shrink: 0;
+}
+
+.terminal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(192, 202, 245, 0.6);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.terminal-btn:hover {
+  color: #c0caf5;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.terminal-btn--close {
+  font-size: 16px;
+  padding: 0px 6px;
+  border: none;
+  color: rgba(192, 202, 245, 0.4);
+}
+
+.terminal-btn--close:hover {
+  color: var(--theme-primary);
+  border: none;
+}
+
+.terminal-xterm {
+  flex: 1;
+  overflow: hidden;
+  padding: 4px 6px;
+  /* xterm.js gère son propre canvas — pas de scroll CSS ici */
+}
+
+/* Surcharge xterm.js pour coller au thème */
+.terminal-xterm .xterm-viewport {
+  background: transparent !important;
+}
+
+
