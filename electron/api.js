@@ -4,15 +4,25 @@ import { buildGraphData } from '../src/graphData.js';
 
 const SETTINGS_FILE = path.resolve('./settings.json');
 const DEFAULT_VAULTS_ROOT = process.env.VAULTS_ROOT || 'C:\\Users\\s.travers\\Documents\\_projet_perso\\agents_vaults';
+const DEFAULT_TERMINAL_BUTTONS = [
+  { id: 'codex', label: 'Codex', command: 'codex' },
+  { id: 'gemini', label: 'Gemini', command: 'agy' },
+];
 
 export function readSettings() {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
-      return { vaultsRoot: data.vaultsRoot || DEFAULT_VAULTS_ROOT };
+      const terminalButtons = Array.isArray(data.terminalButtons)
+        ? data.terminalButtons.filter((item) => item?.label && item?.command).map((item, index) => ({ id: item.id || `terminal-${index}`, label: item.label, command: item.command }))
+        : DEFAULT_TERMINAL_BUTTONS;
+      return {
+        vaultsRoot: data.vaultsRoot || DEFAULT_VAULTS_ROOT,
+        terminalButtons: terminalButtons.length ? terminalButtons : DEFAULT_TERMINAL_BUTTONS,
+      };
     }
   } catch { /* ignore */ }
-  return { vaultsRoot: DEFAULT_VAULTS_ROOT };
+  return { vaultsRoot: DEFAULT_VAULTS_ROOT, terminalButtons: DEFAULT_TERMINAL_BUTTONS };
 }
 
 export function writeSettings(settings) {

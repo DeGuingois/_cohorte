@@ -18,7 +18,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.mjs'),
+      preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -41,15 +41,20 @@ function getShell() {
 app.whenReady().then(() => {
   ipcMain.handle('settings:get', () => readSettings());
   
-  ipcMain.handle('settings:save', (event, vaultsRoot) => {
-    const normalized = path.resolve(vaultsRoot.trim());
+  ipcMain.handle('settings:save', (event, settings) => {
+    const normalized = path.resolve(settings.vaultsRoot.trim());
     let stat;
     try { stat = fs.statSync(normalized); } catch { stat = null; }
     if (!stat || !stat.isDirectory()) {
       throw new Error(`Le répertoire n'existe pas ou n'est pas un dossier : ${normalized}`);
     }
-    writeSettings({ vaultsRoot: normalized });
-    return { ok: true, vaultsRoot: normalized };
+    const terminalButtons = settings.terminalButtons
+      .map(({ id, label, command }, index) => ({ id: id || `terminal-${index}`, label: label.trim(), command: command.trim() }))
+      .filter(({ label, command }) => label && command);
+    if (!terminalButtons.length) throw new Error('Configurez au moins un bouton terminal.');
+    const nextSettings = { vaultsRoot: normalized, terminalButtons };
+    writeSettings(nextSettings);
+    return { ok: true, ...nextSettings };
   });
 
   ipcMain.handle('vaults:get', () => {
@@ -88,45 +93,37 @@ app.whenReady().then(() => {
     return result.filePaths[0];
   });
 
-  ipcMain.handle('terminal:create', (event, vaultId) => {
-    if (ptyProcesses.has(vaultId)) {
-      return { vaultId, exists: true };
-    }
+  const terminalKey = (vaultId, terminalId) => `${vaultId}\0${terminalId}`;
+
+  ipcMain.handle('terminal:create', (event, vaultId, terminalId) => {
+    const key = terminalKey(vaultId, terminalId);
+    if (ptyProcesses.has(key)) return { vaultId, terminalId, exists: true };
+
     const vault = findVault(vaultId);
     const ptyProcess = pty.spawn(getShell(), [], {
-      name: 'xterm-color',
-      cols: 80,
-      rows: 30,
-      cwd: vault.path,
-      env: process.env
+      name: 'xterm-color', cols: 80, rows: 30, cwd: vault.path, env: process.env
     });
-    
-    ptyProcess.onData((data) => {
-      mainWindow.webContents.send('terminal:data', vaultId, data);
+    ptyProcess.onData((data) => mainWindow.webContents.send('terminal:data', vaultId, terminalId, data));
+    ptyProcess.onExit(() => {
+      if (ptyProcesses.get(key) === ptyProcess) ptyProcesses.delete(key);
     });
-    
-    ptyProcesses.set(vaultId, ptyProcess);
-    return { vaultId, exists: false };
+    ptyProcesses.set(key, ptyProcess);
+    return { vaultId, terminalId, exists: false, cwd: vault.path };
   });
 
-  ipcMain.on('terminal:input', (event, vaultId, data) => {
-    const ptyProcess = ptyProcesses.get(vaultId);
-    if (ptyProcess) ptyProcess.write(data);
+  ipcMain.on('terminal:input', (event, vaultId, terminalId, data) => {
+    ptyProcesses.get(terminalKey(vaultId, terminalId))?.write(data);
   });
 
-  ipcMain.on('terminal:resize', (event, vaultId, cols, rows) => {
-    const ptyProcess = ptyProcesses.get(vaultId);
-    if (ptyProcess) {
-      try { ptyProcess.resize(cols, rows); } catch (e) { /* ignore */ }
-    }
+  ipcMain.on('terminal:resize', (event, vaultId, terminalId, cols, rows) => {
+    try { ptyProcesses.get(terminalKey(vaultId, terminalId))?.resize(cols, rows); } catch { /* ignore */ }
   });
 
-  ipcMain.on('terminal:kill', (event, vaultId) => {
-    const ptyProcess = ptyProcesses.get(vaultId);
-    if (ptyProcess) {
-      ptyProcess.kill();
-      ptyProcesses.delete(vaultId);
-    }
+  ipcMain.on('terminal:kill', (event, vaultId, terminalId) => {
+    const key = terminalKey(vaultId, terminalId);
+    const ptyProcess = ptyProcesses.get(key);
+    if (ptyProcess) ptyProcess.kill();
+    ptyProcesses.delete(key);
   });
 
   createWindow();

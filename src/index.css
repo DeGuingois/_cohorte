@@ -2436,12 +2436,16 @@ button {
 /* ─── Terminal panel ────────────────────────────────────────────────────────── */
 
 .terminal-panel {
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border);
   background: #1a1b26;
   overflow: hidden;
-  flex-shrink: 0;
+}
+
+.terminal-panel.is-hidden {
+  display: none;
 }
 
 .terminal-resize-handle {
@@ -2534,3 +2538,9 @@ button {
 }
 
 
+
+.terminal-button-setting { display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+.terminal-button-setting label { display: grid; gap: 5px; font-size: 12px; }
+
+.terminal-btn--kill { color: #ff8f8f; border-color: rgba(255, 100, 100, 0.35); }
+.terminal-btn--kill:hover { color: #fff; border-color: #ff5f5f; background: rgba(255, 70, 70, 0.18); }

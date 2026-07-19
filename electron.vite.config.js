@@ -22,10 +22,16 @@ export default defineConfig({
         input: {
           index: path.resolve(__dirname, 'electron/preload.js'),
         },
+        output: {
+          // Electron n'accepte pas l'ESM dans les preload sandboxés.
+          format: 'cjs',
+          entryFileNames: '[name].js',
+        },
       },
     },
   },
   renderer: {
+    root: __dirname,
     plugins: [react()],
     build: {
       rollupOptions: {

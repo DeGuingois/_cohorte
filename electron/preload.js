@@ -5,16 +5,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getNote: (vaultId, path) => ipcRenderer.invoke('note:get', vaultId, path),
   saveNote: (vaultId, path, content) => ipcRenderer.invoke('note:save', vaultId, path, content),
   getSettings: () => ipcRenderer.invoke('settings:get'),
-  saveSettings: (vaultsRoot) => ipcRenderer.invoke('settings:save', vaultsRoot),
+  saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
   getGraph: (vaultId) => ipcRenderer.invoke('graph:get', vaultId),
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory'),
   terminal: {
-    create: (vaultId) => ipcRenderer.invoke('terminal:create', vaultId),
-    input: (vaultId, data) => ipcRenderer.send('terminal:input', vaultId, data),
-    resize: (vaultId, cols, rows) => ipcRenderer.send('terminal:resize', vaultId, cols, rows),
-    kill: (vaultId) => ipcRenderer.send('terminal:kill', vaultId),
+    create: (vaultId, terminalId) => ipcRenderer.invoke('terminal:create', vaultId, terminalId),
+    input: (vaultId, terminalId, data) => ipcRenderer.send('terminal:input', vaultId, terminalId, data),
+    resize: (vaultId, terminalId, cols, rows) => ipcRenderer.send('terminal:resize', vaultId, terminalId, cols, rows),
+    kill: (vaultId, terminalId) => ipcRenderer.send('terminal:kill', vaultId, terminalId),
     onData: (callback) => {
-      const handler = (event, vaultId, data) => callback(vaultId, data);
+      const handler = (event, vaultId, terminalId, data) => callback(vaultId, terminalId, data);
       ipcRenderer.on('terminal:data', handler);
       return () => ipcRenderer.off('terminal:data', handler);
     }

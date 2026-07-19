@@ -19,6 +19,7 @@ const avatars = {
 };
 
 const VAULT_ORDER_KEY = 'vault-order';
+const DEFAULT_TERMINAL_BUTTONS = [{ id: 'codex', label: 'Codex', command: 'codex' }, { id: 'gemini', label: 'Gemini', command: 'agy' }];
 
 function readStoredVaultOrder() {
   try {
@@ -765,8 +766,9 @@ function FolderIcon() {
   );
 }
 
-function OptionsModal({ currentRoot, onClose, onSaved }) {
+function OptionsModal({ currentRoot, terminalButtons, onClose, onSaved }) {
   const [inputValue, setInputValue] = useState(currentRoot);
+  const [buttonDrafts, setButtonDrafts] = useState(() => terminalButtons.map((item) => ({ ...item })));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -779,10 +781,12 @@ function OptionsModal({ currentRoot, onClose, onSaved }) {
     setError('');
     setSuccess(false);
     try {
-      const data = await window.electronAPI.saveSettings(trimmed);
+      const normalizedButtons = buttonDrafts.map(({ id, label, command }) => ({ id, label: label.trim(), command: command.trim() }));
+      if (!normalizedButtons.length || normalizedButtons.some(({ label, command }) => !label || !command)) throw new Error('Chaque bouton doit avoir un nom et une commande.');
+      const data = await window.electronAPI.saveSettings({ vaultsRoot: trimmed, terminalButtons: normalizedButtons });
       if (!data.ok) throw new Error(data.error || 'Erreur lors de la sauvegarde');
       setSuccess(true);
-      await onSaved();
+      await onSaved(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -836,7 +840,18 @@ function OptionsModal({ currentRoot, onClose, onSaved }) {
                   Parcourir
                 </button>
               </div>
-              {error && <p className="options-error">{error}</p>}
+            <fieldset className="options-fieldset">
+              <legend className="options-legend">Boutons terminal</legend>
+              <p className="options-description">Choisissez le nom affiché et la commande exécutée.</p>
+              {buttonDrafts.map((item, index) => (
+                <div className="terminal-button-setting" key={index}>
+                  <label><span>Nom du bouton</span><input className="options-input" value={item.label} onChange={(event) => setButtonDrafts((current) => current.map((button, i) => i === index ? { ...button, label: event.target.value } : button))} /></label>
+                  <label><span>Commande</span><input className="options-input" value={item.command} onChange={(event) => setButtonDrafts((current) => current.map((button, i) => i === index ? { ...button, command: event.target.value } : button))} /></label>
+                  <button type="button" className="options-btn options-btn--secondary" onClick={() => setButtonDrafts((current) => current.filter((_, i) => i !== index))}>&times;</button>
+                </div>
+              ))}
+              <button type="button" className="options-btn options-btn--secondary" onClick={() => setButtonDrafts((current) => [...current, { id: crypto.randomUUID(), label: '', command: '' }])}>+ Ajouter un bouton</button>
+            </fieldset>              {error && <p className="options-error">{error}</p>}
               {success && <p className="options-success">✓ Répertoire mis à jour — vaults rechargés.</p>}
             </fieldset>
             <div className="options-modal-footer">
@@ -872,8 +887,8 @@ export default function App() {
     return saved ? parseInt(saved, 10) : 286;
   });
   const [isResizing, setIsResizing] = useState(false);
-  const [terminalVisible, setTerminalVisible] = useState(false);
-  const [terminalCommand, setTerminalCommand] = useState('');
+  const [activeTerminalId, setActiveTerminalId] = useState('');
+  const [terminalButtons, setTerminalButtons] = useState(DEFAULT_TERMINAL_BUTTONS);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -1002,6 +1017,11 @@ export default function App() {
   }
 
   useEffect(() => {
+    window.electronAPI.getSettings()
+      .then((settings) => setTerminalButtons(settings.terminalButtons || DEFAULT_TERMINAL_BUTTONS))
+      .catch((err) => setError(err.message));
+  }, []);
+  useEffect(() => {
     refreshVaults().catch((err) => setError(err.message));
   }, []);
 
@@ -1050,35 +1070,23 @@ export default function App() {
       <div className="main-column">
         <header className="top-bar">
           <nav className="top-menu" aria-label="Workspace menu">
+            <button className={view === 'note' ? 'is-selected' : ''} onClick={() => setView('note')}>Note</button>
             <button className={view === 'graph' ? 'is-selected' : ''} onClick={() => setView('graph')}>Synapse</button>
-            <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Deplier dossiers'}</button>
-            <button type="button" onClick={() => { setTerminalCommand('codex'); setTerminalVisible(true); }}>Codex</button>
-            <button type="button" onClick={() => { setTerminalCommand('agy'); setTerminalVisible(true); }}>Gemini</button>
+            {terminalButtons.map((item) => (
+              <button type="button" key={item.id} className={view === 'terminal' && activeTerminalId === item.id ? 'is-selected' : ''} onClick={() => { setActiveTerminalId(item.id); setView('terminal'); }}>{item.label}</button>
+            ))}
+            <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Déplier dossiers'}</button>
+            <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>
+            <button id="settings-btn" className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`} aria-label="Options" title="Options" onClick={() => setOptionsOpen(true)}><GearIcon /></button>
           </nav>
-          <div className="top-title-row">
-            <div className="top-title">
-              <strong>{activeVault?.name || 'No vault'}</strong>
-              <span>{root}</span>
-            </div>
-            <div className="top-actions">
-              {error && <span className="error-text">{error}</span>}
-              <button className={view === 'note' ? 'is-selected' : ''} onClick={() => setView('note')}>Note</button>
-              <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>
-              <button
-                id="settings-btn"
-                className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`}
-                aria-label="Options"
-                title="Options"
-                onClick={() => setOptionsOpen(true)}
-              >
-                <GearIcon />
-              </button>
-            </div>
+          <div className="top-title">
+            <strong>{activeVault?.name || 'No vault'}</strong>
+            <span>{error || root}</span>
           </div>
         </header>
         {view === 'graph' ? (
           <GraphView vault={activeVault} graph={graph} activePath="" onOpenFile={(node) => { setActivePath(node.filePath); setView('note'); }} />
-        ) : (
+        ) : view === 'note' ? (
           <MarkdownEditor
             note={activeFile}
             content={content}
@@ -1090,19 +1098,21 @@ export default function App() {
             onOpenFile={setActivePath}
             onTag={(tag) => setQuery(tag)}
           />
-        )}
-        <TerminalPanel 
-          activeVaultId={activeVaultId} 
-          isVisible={terminalVisible} 
-          onClose={() => setTerminalVisible(false)} 
-          initialCommand={terminalCommand} 
+        ) : null}
+        <TerminalPanel
+          activeVaultId={activeVaultId}
+          terminal={terminalButtons.find((item) => item.id === activeTerminalId)}
+          isVisible={view === 'terminal'}
+          onKill={() => setView('note')}
         />
       </div>
       {optionsOpen && (
         <OptionsModal
           currentRoot={root}
+          terminalButtons={terminalButtons}
           onClose={() => setOptionsOpen(false)}
-          onSaved={async () => {
+          onSaved={async (settings) => {
+            setTerminalButtons(settings.terminalButtons);
             await refreshVaults();
           }}
         />
