@@ -4,8 +4,13 @@ node_modules/
 # Production build
 dist/
 
-# Local/secrets folder (contains private skills, credentials, etc.)
+# Local/secrets folders (contains private skills, credentials, audit reports, etc.)
 _secrets/
+_secret/
+
+# Local settings — contient des chemins propres à la machine, ne jamais commiter.
+# Utiliser settings.example.json comme modèle.
+settings.json
 
 # Environment variables
 .env

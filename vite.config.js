@@ -31,15 +31,43 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+const MAX_BODY_BYTES = 4 * 1024 * 1024; // 4 MB
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
+      if (body.length > MAX_BODY_BYTES) {
+        req.destroy(new Error('Payload too large'));
+      }
     });
-    req.on('end', () => resolve(body ? JSON.parse(body) : {}));
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error('Invalid JSON body'));
+      }
+    });
     req.on('error', reject);
   });
+}
+
+/**
+ * Vérifie que la requête provient bien de localhost.
+ * Protège contre le CSRF : une page tiers ne peut pas appeler les endpoints
+ * d'écriture depuis le navigateur de l'utilisateur.
+ */
+function assertLocalOrigin(req, res) {
+  const origin = req.headers.origin || req.headers.referer || '';
+  const isLocal = !origin
+    || origin.startsWith('http://localhost')
+    || origin.startsWith('http://127.0.0.1');
+  if (!isLocal) {
+    sendJson(res, 403, { error: 'Forbidden: cross-origin request rejected' });
+    return false;
+  }
+  return true;
 }
 
 function slug(value) {
@@ -58,7 +86,19 @@ function vaultAvatar(name) {
 
 function safeResolve(base, relativePath = '') {
   const resolved = path.resolve(base, relativePath);
-  if (!resolved.toLowerCase().startsWith(path.resolve(base).toLowerCase())) {
+  // Résout les symlinks pour éviter qu'un lien symbolique dans le vault
+  // ne permette de sortir de la racine autorisée (symlink path traversal).
+  const realBase = fs.realpathSync.native(path.resolve(base));
+  let realResolved;
+  try {
+    realResolved = fs.realpathSync.native(resolved);
+  } catch {
+    // Le fichier n'existe pas encore (ex: création) — on vérifie le chemin résolu
+    // sans symlinks, qui est suffisant dans ce cas.
+    realResolved = resolved;
+  }
+  if (!realResolved.toLowerCase().startsWith(realBase.toLowerCase() + path.sep)
+      && realResolved.toLowerCase() !== realBase.toLowerCase()) {
     throw new Error('Path escapes vault root');
   }
   return resolved;
@@ -184,13 +224,22 @@ function obsidianLocalApi() {
             return;
           }
           if (req.method === 'POST') {
+            if (!assertLocalOrigin(req, res)) return;
             const body = await readBody(req);
             if (typeof body.vaultsRoot !== 'string' || !body.vaultsRoot.trim()) {
               sendJson(res, 400, { error: 'Invalid vaultsRoot' });
               return;
             }
-            writeSettings({ vaultsRoot: body.vaultsRoot.trim() });
-            sendJson(res, 200, { ok: true, vaultsRoot: body.vaultsRoot.trim() });
+            const normalized = path.resolve(body.vaultsRoot.trim());
+            // Vérifie que le chemin est un dossier existant avant toute écriture.
+            let stat;
+            try { stat = fs.statSync(normalized); } catch { stat = null; }
+            if (!stat || !stat.isDirectory()) {
+              sendJson(res, 400, { error: `Le répertoire n'existe pas ou n'est pas un dossier : ${normalized}` });
+              return;
+            }
+            writeSettings({ vaultsRoot: normalized });
+            sendJson(res, 200, { ok: true, vaultsRoot: normalized });
             return;
           }
           sendJson(res, 405, { error: 'Method not allowed' });
@@ -226,6 +275,7 @@ function obsidianLocalApi() {
           }
 
           if (req.method === 'POST') {
+            if (!assertLocalOrigin(req, res)) return;
             const body = await readBody(req);
             const vault = findVault(body.vaultId);
             const fullPath = safeResolve(vault.path, body.path);
