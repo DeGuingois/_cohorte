@@ -2544,3 +2544,70 @@ button {
 
 .terminal-btn--kill { color: #ff8f8f; border-color: rgba(255, 100, 100, 0.35); }
 .terminal-btn--kill:hover { color: #fff; border-color: #ff5f5f; background: rgba(255, 70, 70, 0.18); }
+
+.tree-folder-toggle {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.tree-create-file {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: currentColor;
+  opacity: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tree-folder:hover .tree-create-file,
+.tree-create-file:focus-visible {
+  opacity: .72;
+}
+
+.tree-create-file:hover {
+  opacity: 1;
+  border-color: currentColor;
+  background: rgba(255,255,255,.75);
+}
+
+.tree-create-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+  margin: 2px 0 5px;
+}
+
+.tree-create-form input {
+  min-width: 0;
+  width: 100%;
+  height: 25px;
+  padding: 3px 7px;
+  border: 1px solid var(--theme-primary);
+  border-radius: 4px;
+  outline: none;
+  background: white;
+  color: var(--text-base);
+  font: inherit;
+  font-size: 12px;
+}
+
+.tree-create-error {
+  position: absolute;
+  right: 14px;
+  color: var(--theme-primary);
+  font-weight: 800;
+}

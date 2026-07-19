@@ -508,15 +508,67 @@ function VaultRail({ vaults, activeVault, onSelectVault, onReorderVaults }) {
   );
 }
 
-function TreeNode({ node, activePath, query, openFolders, onToggleFolder, onOpenFile, depth = 0 }) {
+function TreeNode({ node, activePath, query, openFolders, onToggleFolder, onOpenFile, onCreateFile, depth = 0 }) {
+  const [creating, setCreating] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [createError, setCreateError] = useState('');
+
+  async function submitNewFile(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await onCreateFile(node.path, fileName);
+      setCreating(false);
+      setFileName('');
+      setCreateError('');
+    } catch (error) {
+      setCreateError(error.message);
+    }
+  }
+
   if (node.type === 'folder') {
     const open = openFolders.has(node.path);
     return (
       <div>
-        <button className="tree-row tree-folder" style={{ paddingLeft: 10 + depth * 14 }} onClick={() => onToggleFolder(node.path)}>
-          <span className={`chevron ${open ? 'is-open' : ''}`}>{'>'}</span>
-          <span className="tree-label">{node.name}</span>
-        </button>
+        <div className="tree-row tree-folder" style={{ paddingLeft: 10 + depth * 14 }}>
+          <button type="button" className="tree-folder-toggle" onClick={() => onToggleFolder(node.path)}>
+            <span className={`chevron ${open ? 'is-open' : ''}`}>{'>'}</span>
+            <span className="tree-label">{node.name}</span>
+          </button>
+          <button
+            type="button"
+            className="tree-create-file"
+            title={`Créer une note dans ${node.name}`}
+            aria-label={`Créer une note dans ${node.name}`}
+            onClick={() => {
+              if (!open) onToggleFolder(node.path);
+              setCreating(true);
+              setCreateError('');
+            }}
+          >
+            +
+          </button>
+        </div>
+        {creating && (
+          <form className="tree-create-form" style={{ paddingLeft: 28 + (depth + 1) * 14 }} onSubmit={submitNewFile}>
+            <input
+              autoFocus
+              value={fileName}
+              onChange={(event) => setFileName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setCreating(false);
+                  setFileName('');
+                  setCreateError('');
+                }
+              }}
+              onBlur={() => { if (!fileName.trim()) setCreating(false); }}
+              placeholder="Nouvelle note"
+              aria-label="Nom de la nouvelle note"
+            />
+            {createError && <span className="tree-create-error" title={createError}>!</span>}
+          </form>
+        )}
         {open && node.children?.map((child) => (
           <TreeNode
             key={`${child.type}:${child.path}`}
@@ -526,6 +578,7 @@ function TreeNode({ node, activePath, query, openFolders, onToggleFolder, onOpen
             openFolders={openFolders}
             onToggleFolder={onToggleFolder}
             onOpenFile={onOpenFile}
+            onCreateFile={onCreateFile}
             depth={depth + 1}
           />
         ))}
@@ -534,11 +587,7 @@ function TreeNode({ node, activePath, query, openFolders, onToggleFolder, onOpen
   }
 
   return (
-    <button
-      className={`tree-row tree-file ${activePath === node.path ? 'is-active' : ''}`}
-      style={{ paddingLeft: 28 + depth * 14 }}
-      onClick={() => onOpenFile(node.path)}
-    >
+    <button className={`tree-row tree-file ${activePath === node.path ? 'is-active' : ''}`} style={{ paddingLeft: 28 + depth * 14 }} onClick={() => onOpenFile(node.path)}>
       <span className="tree-label">{node.label}</span>
     </button>
   );
@@ -566,7 +615,7 @@ function collectFolderPaths(nodes, paths = []) {
   return paths;
 }
 
-function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, openFolders, onToggleFolder, onResizeStart, isResizing }) {
+function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, onCreateFile, openFolders, onToggleFolder, onResizeStart, isResizing }) {
   const tree = useMemo(() => filterTree(vault?.tree || [], query), [vault, query]);
   const visibleFolders = query.trim() ? new Set(collectFolderPaths(tree)) : openFolders;
 
@@ -592,6 +641,7 @@ function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, ope
             openFolders={visibleFolders}
             onToggleFolder={onToggleFolder}
             onOpenFile={onOpenFile}
+            onCreateFile={onCreateFile}
           />
         ))}
       </div>
@@ -978,9 +1028,24 @@ export default function App() {
     }
   }
 
+  async function createNote(folderPath, requestedName) {
+    if (!activeVault) throw new Error('Aucun vault sélectionné.');
+    const trimmed = requestedName.trim();
+    if (!trimmed) throw new Error('Saisissez un nom de fichier.');
+    if (/[\\/:*?"<>|]/.test(trimmed) || trimmed === '.' || trimmed === '..') {
+      throw new Error('Ce nom de fichier contient un caractère interdit.');
+    }
+    const fileName = trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
+    const notePath = folderPath ? `${folderPath}/${fileName}` : fileName;
+    const title = fileName.replace(/\.md$/i, '');
+    await window.electronAPI.createNote(activeVault.id, notePath, `# ${title}\n`);
+    await refreshVaults(activeVault.id, notePath);
+    setView('note');
+  }
   function selectVault(vault) {
     setActiveVaultId(vault.id);
     setActivePath(vault.files[0]?.path || '');
+    setView('graph');
     setGraph(null);
     setQuery('');
   }
@@ -1062,6 +1127,7 @@ export default function App() {
         query={query}
         onQueryChange={setQuery}
         onOpenFile={setActivePath}
+        onCreateFile={createNote}
         openFolders={currentOpenFolders}
         onToggleFolder={toggleFolder}
         onResizeStart={() => setIsResizing(true)}

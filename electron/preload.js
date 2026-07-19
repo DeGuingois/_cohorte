@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVaults: () => ipcRenderer.invoke('vaults:get'),
   getNote: (vaultId, path) => ipcRenderer.invoke('note:get', vaultId, path),
   saveNote: (vaultId, path, content) => ipcRenderer.invoke('note:save', vaultId, path, content),
+  createNote: (vaultId, path, content) => ipcRenderer.invoke('note:create', vaultId, path, content),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
   getGraph: (vaultId) => ipcRenderer.invoke('graph:get', vaultId),

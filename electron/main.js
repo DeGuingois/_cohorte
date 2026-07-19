@@ -82,6 +82,14 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  ipcMain.handle('note:create', (event, vaultId, notePath, content) => {
+    const vault = findVault(vaultId);
+    const fullPath = safeResolve(vault.path, notePath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content ?? '', { encoding: 'utf8', flag: 'wx' });
+    return { ok: true, path: notePath };
+  });
+
   ipcMain.handle('graph:get', (event, vaultId) => {
     return getGraph(vaultId);
   });
