@@ -31,11 +31,12 @@
   "main": "./out/main/main.js",
   "build": {
     "appId": "com.cohorte.app",
-    "productName": "Cohorte",
+    "productName": "Cohorte - Orchrestration LLM souveraine",
     "directories": {
       "output": "release"
     },
     "win": {
+      "icon": "src/avatars/cohorte_icon.png",
       "target": [
         "nsis"
       ]

@@ -13,8 +13,22 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow;
 
+function getAppIconPath() {
+  const possiblePaths = [
+    path.join(app.getAppPath(), 'src/avatars/cohorte_icon.png'),
+    path.join(__dirname, '../src/avatars/cohorte_icon.png'),
+    path.join(__dirname, '../../src/avatars/cohorte_icon.png'),
+    path.join(__dirname, '../renderer/src/avatars/cohorte_icon.png'),
+    path.join(__dirname, '../renderer/cohorte_icon.png'),
+  ];
+  return possiblePaths.find((p) => fs.existsSync(p));
+}
+
 function createWindow() {
+  const iconPath = getAppIconPath();
   mainWindow = new BrowserWindow({
+    title: 'Cohorte - Orchrestration LLM souveraine',
+    ...(iconPath ? { icon: iconPath } : {}),
     width: 1200,
     height: 800,
     webPreferences: {

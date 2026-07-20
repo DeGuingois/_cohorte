@@ -5,6 +5,7 @@ import eliAvatar from './avatars/eli.png';
 import kiraAvatar from './avatars/kira.png';
 import miloAvatar from './avatars/milo.png';
 import zoeAvatar from './avatars/zoe.png';
+import cohorteIcon from './avatars/cohorte_icon.png';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
 import TerminalPanel from './TerminalPanel.jsx';
@@ -16,6 +17,7 @@ const avatars = {
   kira: kiraAvatar,
   milo: miloAvatar,
   zoe: zoeAvatar,
+  cohorte: cohorteIcon,
 };
 
 const VAULT_ORDER_KEY = 'vault-order';
@@ -1106,6 +1108,10 @@ export default function App() {
     });
     return () => controller.abort();
   }, [activeVaultId, vaults]);
+
+  useEffect(() => {
+    document.title = 'Cohorte - Orchrestration LLM souveraine';
+  }, []);
 
   useEffect(() => {
     const onKey = (event) => {
