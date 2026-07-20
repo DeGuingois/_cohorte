@@ -29,6 +29,48 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
       xtermRef.current = term;
       fitRef.current = fit;
 
+      term.attachCustomKeyEventHandler((arg) => {
+        if (arg.type !== 'keydown') return true;
+        const isMod = arg.ctrlKey || arg.metaKey;
+        if (isMod && arg.code === 'KeyC' && term.hasSelection()) {
+          navigator.clipboard.writeText(term.getSelection());
+          return false;
+        }
+        if (isMod && arg.code === 'KeyV') {
+          navigator.clipboard.readText().then((text) => {
+            if (text) {
+              const { vaultId, terminalId } = activeSessionRef.current;
+              if (vaultId && terminalId) window.electronAPI.terminal.input(vaultId, terminalId, text);
+            }
+          }).catch(() => {});
+          return false;
+        }
+        return true;
+      });
+
+      const handleContextMenu = (e) => {
+        e.preventDefault();
+        navigator.clipboard.readText().then((text) => {
+          if (text) {
+            const { vaultId, terminalId } = activeSessionRef.current;
+            if (vaultId && terminalId) window.electronAPI.terminal.input(vaultId, terminalId, text);
+          }
+        }).catch(() => {});
+      };
+
+      const handlePaste = (e) => {
+        e.preventDefault();
+        const text = e.clipboardData?.getData('text/plain');
+        if (text) {
+          const { vaultId, terminalId } = activeSessionRef.current;
+          if (vaultId && terminalId) window.electronAPI.terminal.input(vaultId, terminalId, text);
+        }
+      };
+
+      const dom = domRef.current;
+      dom?.addEventListener('contextmenu', handleContextMenu);
+      dom?.addEventListener('paste', handlePaste);
+
       term.onData((data) => {
         const { vaultId, terminalId } = activeSessionRef.current;
         if (vaultId && terminalId) window.electronAPI.terminal.input(vaultId, terminalId, data);

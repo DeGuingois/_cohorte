@@ -98,10 +98,11 @@ app.whenReady().then(() => {
 
   ipcMain.handle('note:create', (event, vaultId, notePath, content) => {
     const vault = findVault(vaultId);
-    const fullPath = safeResolve(vault.path, notePath);
+    const normalizedPath = notePath.toLowerCase().endsWith('.md') ? notePath : `${notePath}.md`;
+    const fullPath = safeResolve(vault.path, normalizedPath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, content ?? '', { encoding: 'utf8', flag: 'wx' });
-    return { ok: true, path: notePath };
+    fs.writeFileSync(fullPath, content ?? '', 'utf8');
+    return { ok: true, path: normalizedPath };
   });
 
   ipcMain.handle('graph:get', (event, vaultId) => {

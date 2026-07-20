@@ -620,13 +620,62 @@ function collectFolderPaths(nodes, paths = []) {
 function FileExplorer({ vault, activePath, query, onQueryChange, onOpenFile, onCreateFile, openFolders, onToggleFolder, onResizeStart, isResizing }) {
   const tree = useMemo(() => filterTree(vault?.tree || [], query), [vault, query]);
   const visibleFolders = query.trim() ? new Set(collectFolderPaths(tree)) : openFolders;
+  const [creatingRoot, setCreatingRoot] = useState(false);
+  const [rootFileName, setRootFileName] = useState('');
+  const [rootCreateError, setRootCreateError] = useState('');
+
+  async function submitRootFile(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await onCreateFile('', rootFileName);
+      setCreatingRoot(false);
+      setRootFileName('');
+      setRootCreateError('');
+    } catch (error) {
+      setRootCreateError(error.message);
+    }
+  }
 
   return (
     <aside className="file-pane">
       <div className="pane-title">
         <span>{vault?.name || 'Vault'}</span>
-        <strong>{vault?.notes || 0}</strong>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <strong>{vault?.notes || 0}</strong>
+          <button
+            type="button"
+            className="tree-create-file"
+            title="Créer une note à la racine"
+            aria-label="Créer une note à la racine"
+            onClick={() => {
+              setCreatingRoot(true);
+              setRootCreateError('');
+            }}
+          >
+            +
+          </button>
+        </div>
       </div>
+      {creatingRoot && (
+        <form className="tree-create-form" style={{ padding: '4px 10px' }} onSubmit={submitRootFile}>
+          <input
+            autoFocus
+            value={rootFileName}
+            onChange={(event) => setRootFileName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setCreatingRoot(false);
+                setRootFileName('');
+                setRootCreateError('');
+              }
+            }}
+            placeholder="Nouvelle note"
+            aria-label="Nom de la nouvelle note à la racine"
+          />
+          {rootCreateError && <span className="tree-create-error" title={rootCreateError}>!</span>}
+        </form>
+      )}
       <input
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
@@ -1030,6 +1079,14 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!activeVault || !activePath || !dirty || saving) return undefined;
+    const timer = setTimeout(() => {
+      saveNote();
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [content, dirty, activeVault, activePath, saving]);
+
   async function createNote(folderPath, requestedName) {
     if (!activeVault) throw new Error('Aucun vault sélectionné.');
     const trimmed = requestedName.trim();
@@ -1037,11 +1094,14 @@ export default function App() {
     if (/[\\/:*?"<>|]/.test(trimmed) || trimmed === '.' || trimmed === '..') {
       throw new Error('Ce nom de fichier contient un caractère interdit.');
     }
-    const fileName = trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
-    const notePath = folderPath ? `${folderPath}/${fileName}` : fileName;
-    const title = fileName.replace(/\.md$/i, '');
-    await window.electronAPI.createNote(activeVault.id, notePath, `# ${title}\n`);
-    await refreshVaults(activeVault.id, notePath);
+    const cleanTitle = trimmed.replace(/\.md$/i, '');
+    const fileName = `${cleanTitle}.md`;
+    const notePath = (folderPath && folderPath !== '/') ? `${folderPath}/${fileName}` : fileName;
+    const res = await window.electronAPI.createNote(activeVault.id, notePath, `# ${cleanTitle}\n\n`);
+    const finalPath = res?.path || notePath;
+    await refreshVaults(activeVault.id, finalPath);
+    await openNote(activeVault.id, finalPath);
+    setActivePath(finalPath);
     setView('note');
   }
   function selectVault(vault) {

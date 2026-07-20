@@ -48,16 +48,18 @@ function vaultAvatar(name) {
 }
 
 export function safeResolve(base, relativePath = '') {
-  const resolved = path.resolve(base, relativePath);
-  const realBase = fs.realpathSync.native(path.resolve(base));
-  let realResolved;
-  try {
-    realResolved = fs.realpathSync.native(resolved);
-  } catch {
-    realResolved = resolved;
-  }
-  if (!realResolved.toLowerCase().startsWith(realBase.toLowerCase() + path.sep)
-      && realResolved.toLowerCase() !== realBase.toLowerCase()) {
+  const absBase = path.resolve(base);
+  const resolved = path.resolve(absBase, relativePath);
+
+  const cleanBase = absBase.replace(/^\\\\\?\\/, '');
+  const cleanResolved = resolved.replace(/^\\\\\?\\/, '');
+
+  const normBase = path.normalize(cleanBase).toLowerCase();
+  const normResolved = path.normalize(cleanResolved).toLowerCase();
+
+  const baseWithSep = normBase.endsWith(path.sep) ? normBase : normBase + path.sep;
+
+  if (!normResolved.startsWith(baseWithSep) && normResolved !== normBase) {
     throw new Error('Path escapes vault root');
   }
   return resolved;
