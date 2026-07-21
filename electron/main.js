@@ -152,6 +152,15 @@ app.whenReady().then(() => {
     try { ptyProcesses.get(terminalKey(vaultId, terminalId))?.resize(cols, rows); } catch { /* ignore */ }
   });
 
+  ipcMain.handle('terminal:listActive', () => {
+    const list = [];
+    for (const [key] of ptyProcesses.entries()) {
+      const [vaultId, terminalId] = key.split('\0');
+      list.push({ vaultId, terminalId });
+    }
+    return list;
+  });
+
   ipcMain.on('terminal:kill', (event, vaultId, terminalId) => {
     const key = terminalKey(vaultId, terminalId);
     const ptyProcess = ptyProcesses.get(key);

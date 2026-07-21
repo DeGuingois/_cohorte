@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory'),
   terminal: {
     create: (vaultId, terminalId, cols, rows) => ipcRenderer.invoke('terminal:create', vaultId, terminalId, cols, rows),
+    listActive: () => ipcRenderer.invoke('terminal:listActive'),
     input: (vaultId, terminalId, data) => ipcRenderer.send('terminal:input', vaultId, terminalId, data),
     resize: (vaultId, terminalId, cols, rows) => ipcRenderer.send('terminal:resize', vaultId, terminalId, cols, rows),
     kill: (vaultId, terminalId) => ipcRenderer.send('terminal:kill', vaultId, terminalId),

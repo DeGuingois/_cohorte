@@ -1053,6 +1053,138 @@ function OptionsModal({ currentRoot, terminalButtons, onClose, onSaved }) {
   );
 }
 
+function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) {
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const fetchSessions = async () => {
+    try {
+      const list = await window.electronAPI.terminal.listActive();
+      setActiveSessions(list || []);
+    } catch {
+      setActiveSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+    const interval = setInterval(fetchSessions, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSendBye = async (vaultId, terminalId) => {
+    try {
+      await window.electronAPI.terminal.input(vaultId, terminalId, '_bye\r');
+      setToastMessage(`Commande _bye envoyée à ${vaultId} (${terminalId})`);
+      setTimeout(() => setToastMessage(''), 3000);
+    } catch (err) {
+      setToastMessage(`Erreur: ${err.message}`);
+    }
+  };
+
+  const handleKill = async (vaultId, terminalId) => {
+    try {
+      await window.electronAPI.terminal.kill(vaultId, terminalId);
+      setToastMessage(`Terminal ${vaultId} (${terminalId}) arrêté`);
+      setTimeout(() => setToastMessage(''), 3000);
+      fetchSessions();
+    } catch (err) {
+      setToastMessage(`Erreur: ${err.message}`);
+    }
+  };
+
+  const handleBackdropClick = (event) => {
+    if (event.target === event.currentTarget) onClose();
+  };
+
+  const getVault = (vaultId) => vaults.find((v) => v.id === vaultId);
+  const getTerminal = (termId) => terminalButtons.find((t) => t.id === termId);
+
+  return (
+    <div className="options-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-label="Superviseur">
+      <div className="options-modal supervisor-modal">
+        <div className="options-modal-header">
+          <div className="options-modal-title">
+            <span style={{ fontSize: '18px' }}>🛡️</span>
+            <span>Superviseur des Terminaux</span>
+          </div>
+          <button className="options-close" onClick={onClose} aria-label="Fermer">&times;</button>
+        </div>
+        <div className="options-modal-body">
+          {toastMessage && <div className="supervisor-toast">{toastMessage}</div>}
+
+          {loading ? (
+            <div className="supervisor-empty">Chargement des sessions...</div>
+          ) : activeSessions.length === 0 ? (
+            <div className="supervisor-empty">
+              Aucun terminal actif pour le moment.
+            </div>
+          ) : (
+            <div className="supervisor-list">
+              {activeSessions.map((session) => {
+                const vault = getVault(session.vaultId);
+                const term = getTerminal(session.terminalId);
+                const vaultName = vault?.name || session.vaultId;
+                const termName = term?.label || session.terminalId;
+
+                return (
+                  <div key={`${session.vaultId}-${session.terminalId}`} className="supervisor-card">
+                    <div className="supervisor-card-info">
+                      <div className="supervisor-avatar-wrap">
+                        <img src={getAvatarSrc(vault)} alt="" draggable={false} />
+                      </div>
+                      <div className="supervisor-details">
+                        <strong>{termName}</strong>
+                        <span>Vault : {vaultName}</span>
+                      </div>
+                      <span className="supervisor-status-badge">● Actif</span>
+                    </div>
+
+                    <div className="supervisor-card-actions">
+                      <button
+                        type="button"
+                        className="supervisor-btn supervisor-btn--focus"
+                        onClick={() => {
+                          onSelectSession(session.vaultId, session.terminalId);
+                          onClose();
+                        }}
+                        title="Accéder à ce terminal"
+                      >
+                        👁️ Aller au terminal
+                      </button>
+
+                      <button
+                        type="button"
+                        className="supervisor-btn supervisor-btn--bye"
+                        onClick={() => handleSendBye(session.vaultId, session.terminalId)}
+                        title="Envoyer '_bye' pour clôturer la session"
+                      >
+                        👋 Envoyer _bye
+                      </button>
+
+                      <button
+                        type="button"
+                        className="supervisor-btn supervisor-btn--kill"
+                        onClick={() => handleKill(session.vaultId, session.terminalId)}
+                        title="Arrêter le terminal (Kill)"
+                      >
+                        ☠️ Kill
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [vaults, setVaults] = useState([]);
   const [root, setRoot] = useState('');
@@ -1068,6 +1200,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [filePaneWidth, setFilePaneWidth] = useState(() => {
     const saved = localStorage.getItem('file-pane-width');
     return saved ? parseInt(saved, 10) : 286;
@@ -1299,6 +1432,7 @@ export default function App() {
             ))}
             <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Déplier dossiers'}</button>
             <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>
+            <button type="button" className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`} title="Superviseur des terminaux" onClick={() => setSupervisorOpen(true)}>🛡️ Superviseur</button>
             <button id="settings-btn" className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`} aria-label="Options" title="Options" onClick={() => setOptionsOpen(true)}><GearIcon /></button>
           </nav>
           <div className="top-title">
@@ -1328,6 +1462,18 @@ export default function App() {
           onKill={() => setView('note')}
         />
       </div>
+      {supervisorOpen && (
+        <SupervisorModal
+          vaults={vaults}
+          terminalButtons={terminalButtons}
+          onClose={() => setSupervisorOpen(false)}
+          onSelectSession={(vaultId, terminalId) => {
+            setActiveVaultId(vaultId);
+            setActiveTerminalId(terminalId);
+            setView('terminal');
+          }}
+        />
+      )}
       {optionsOpen && (
         <OptionsModal
           currentRoot={root}
