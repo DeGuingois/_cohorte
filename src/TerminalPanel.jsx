@@ -81,11 +81,22 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
       });
     }
 
-    return window.electronAPI.terminal.onData((vaultId, terminalId, data) => {
+    const unsubData = window.electronAPI.terminal.onData((vaultId, terminalId, data) => {
       const key = sessionKey(vaultId, terminalId);
       sessionBuffers.set(key, `${sessionBuffers.get(key) || ''}${data}`);
       if (key === activeSessionRef.current.key) xtermRef.current?.write(data);
     });
+
+    const unsubExit = window.electronAPI.terminal.onExit((vaultId, terminalId) => {
+      const key = sessionKey(vaultId, terminalId);
+      sessionBuffers.delete(key);
+      startedSessions.delete(key);
+    });
+
+    return () => {
+      unsubData();
+      unsubExit?.();
+    };
   }, []);
 
   useEffect(() => {

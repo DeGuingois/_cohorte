@@ -1071,7 +1071,7 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
 
   useEffect(() => {
     fetchSessions();
-    const interval = setInterval(fetchSessions, 2000);
+    const interval = setInterval(fetchSessions, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1110,7 +1110,12 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
           <div className="options-modal-title">
             <span>Vigile - Terminaux actifs</span>
           </div>
-          <button className="options-close" onClick={onClose} aria-label="Fermer">&times;</button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button type="button" className="options-btn options-btn--secondary" onClick={fetchSessions} style={{ padding: '2px 8px', fontSize: '11px' }} title="Rafraîchir">
+              🔄 Refresh
+            </button>
+            <button className="options-close" onClick={onClose} aria-label="Fermer">&times;</button>
+          </div>
         </div>
         <div className="options-modal-body">
           {toastMessage && <div className="supervisor-toast">{toastMessage}</div>}

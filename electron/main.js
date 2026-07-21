@@ -122,26 +122,39 @@ app.whenReady().then(() => {
     const key = terminalKey(vaultId, terminalId);
     if (ptyProcesses.has(key)) return { vaultId, terminalId, exists: true };
 
-    const vault = findVault(vaultId);
+    let vaultPath = process.cwd();
+    try {
+      const vault = findVault(vaultId);
+      if (vault && vault.path && fs.existsSync(vault.path)) {
+        vaultPath = vault.path;
+      }
+    } catch { /* fallback to cwd */ }
+
     const env = {
       ...process.env,
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
     };
 
+    const validCols = typeof cols === 'number' && cols > 10 ? cols : 80;
+    const validRows = typeof rows === 'number' && rows > 5 ? rows : 30;
+
     const ptyProcess = pty.spawn(getShell(), [], {
       name: 'xterm-256color',
-      cols: Math.max(cols || 80, 20),
-      rows: Math.max(rows || 30, 5),
-      cwd: vault.path,
+      cols: validCols,
+      rows: validRows,
+      cwd: vaultPath,
       env,
     });
     ptyProcess.onData((data) => mainWindow.webContents.send('terminal:data', vaultId, terminalId, data));
-    ptyProcess.onExit(() => {
-      if (ptyProcesses.get(key) === ptyProcess) ptyProcesses.delete(key);
+    ptyProcess.onExit(({ exitCode } = {}) => {
+      if (ptyProcesses.get(key) === ptyProcess) {
+        ptyProcesses.delete(key);
+        mainWindow.webContents.send('terminal:exit', vaultId, terminalId, exitCode);
+      }
     });
     ptyProcesses.set(key, ptyProcess);
-    return { vaultId, terminalId, exists: false, cwd: vault.path };
+    return { vaultId, terminalId, exists: false, cwd: vaultPath };
   });
 
   ipcMain.on('terminal:input', (event, vaultId, terminalId, data) => {

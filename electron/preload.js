@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (event, vaultId, terminalId, data) => callback(vaultId, terminalId, data);
       ipcRenderer.on('terminal:data', handler);
       return () => ipcRenderer.off('terminal:data', handler);
+    },
+    onExit: (callback) => {
+      const handler = (event, vaultId, terminalId, exitCode) => callback(vaultId, terminalId, exitCode);
+      ipcRenderer.on('terminal:exit', handler);
+      return () => ipcRenderer.off('terminal:exit', handler);
     }
   }
 });
