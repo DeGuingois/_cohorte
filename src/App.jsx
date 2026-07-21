@@ -1053,12 +1053,114 @@ function OptionsModal({ currentRoot, terminalButtons, onClose, onSaved }) {
   );
 }
 
+function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
+  const [customInput, setCustomInput] = useState('');
+
+  const vaultName = vault?.name || session.vaultId;
+  const termName = term?.label || session.terminalId;
+
+  const handleSendText = async (text) => {
+    if (!text) return;
+    try {
+      await window.electronAPI.terminal.input(session.vaultId, session.terminalId, `${text}\r`);
+      onToast(`Envoyé à ${vaultName} (${termName}) : "${text}"`);
+    } catch (err) {
+      onToast(`Erreur: ${err.message}`);
+    }
+  };
+
+  const handleKill = async () => {
+    try {
+      await window.electronAPI.terminal.kill(session.vaultId, session.terminalId);
+      onToast(`Terminal ${vaultName} (${termName}) arrêté`);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      onToast(`Erreur: ${err.message}`);
+    }
+  };
+
+  return (
+    <div className="supervisor-card">
+      <div className="supervisor-card-info">
+        <div className="supervisor-avatar-wrap">
+          <img src={getAvatarSrc(vault)} alt="" draggable={false} />
+        </div>
+        <div className="supervisor-details">
+          <strong>{termName}</strong>
+          <span>Vault : {vaultName}</span>
+        </div>
+        <span className="supervisor-status-badge">● Actif</span>
+      </div>
+
+      <div className="supervisor-card-actions">
+        <button
+          type="button"
+          className="supervisor-btn supervisor-btn--focus"
+          onClick={onFocus}
+          title="Accéder à ce terminal"
+        >
+          👁️ Aller au terminal
+        </button>
+
+        <button
+          type="button"
+          className="supervisor-btn supervisor-btn--hello"
+          onClick={() => handleSendText('@hello.md')}
+          title="Envoyer '@hello.md' à ce terminal"
+        >
+          📄 @hello.md
+        </button>
+
+        <button
+          type="button"
+          className="supervisor-btn supervisor-btn--bye"
+          onClick={() => handleSendText('_bye')}
+          title="Envoyer '_bye' pour clôturer la session"
+        >
+          👋 _bye
+        </button>
+
+        <button
+          type="button"
+          className="supervisor-btn supervisor-btn--kill"
+          onClick={handleKill}
+          title="Arrêter le terminal (Kill)"
+        >
+          ☠️ Kill
+        </button>
+      </div>
+
+      <form
+        className="supervisor-custom-send-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (customInput.trim()) {
+            handleSendText(customInput.trim());
+            setCustomInput('');
+          }
+        }}
+      >
+        <input
+          type="text"
+          className="supervisor-custom-input"
+          placeholder="Ex: @hello.md ou commande…"
+          value={customInput}
+          onChange={(e) => setCustomInput(e.target.value)}
+        />
+        <button type="submit" className="supervisor-btn supervisor-btn--send" disabled={!customInput.trim()}>
+          Envoyer ↵
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) {
   const [activeSessions, setActiveSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       const list = await window.electronAPI.terminal.listActive();
       setActiveSessions(list || []);
@@ -1067,40 +1169,19 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchSessions();
     const interval = setInterval(fetchSessions, 1000);
     return () => clearInterval(interval);
-  }, []);
-
-  const handleSendBye = async (vaultId, terminalId) => {
-    try {
-      await window.electronAPI.terminal.input(vaultId, terminalId, '_bye\r');
-      setToastMessage(`Commande _bye envoyée à ${vaultId} (${terminalId})`);
-      setTimeout(() => setToastMessage(''), 3000);
-    } catch (err) {
-      setToastMessage(`Erreur: ${err.message}`);
-    }
-  };
-
-  const handleKill = async (vaultId, terminalId) => {
-    try {
-      await window.electronAPI.terminal.kill(vaultId, terminalId);
-      setToastMessage(`Terminal ${vaultId} (${terminalId}) arrêté`);
-      setTimeout(() => setToastMessage(''), 3000);
-      fetchSessions();
-    } catch (err) {
-      setToastMessage(`Erreur: ${err.message}`);
-    }
-  };
+  }, [fetchSessions]);
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) onClose();
   };
 
-  const getVault = (vaultId) => vaults.find((v) => v.id === vaultId);
+  const getVault = (vaultId) => vaults.find((v) => v.id === vaultId || v.name === vaultId);
   const getTerminal = (termId) => terminalButtons.find((t) => t.id === termId);
 
   return (
@@ -1128,59 +1209,23 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
             </div>
           ) : (
             <div className="supervisor-list">
-              {activeSessions.map((session) => {
-                const vault = getVault(session.vaultId);
-                const term = getTerminal(session.terminalId);
-                const vaultName = vault?.name || session.vaultId;
-                const termName = term?.label || session.terminalId;
-
-                return (
-                  <div key={`${session.vaultId}-${session.terminalId}`} className="supervisor-card">
-                    <div className="supervisor-card-info">
-                      <div className="supervisor-avatar-wrap">
-                        <img src={getAvatarSrc(vault)} alt="" draggable={false} />
-                      </div>
-                      <div className="supervisor-details">
-                        <strong>{termName}</strong>
-                        <span>Vault : {vaultName}</span>
-                      </div>
-                      <span className="supervisor-status-badge">● Actif</span>
-                    </div>
-
-                    <div className="supervisor-card-actions">
-                      <button
-                        type="button"
-                        className="supervisor-btn supervisor-btn--focus"
-                        onClick={() => {
-                          onSelectSession(session.vaultId, session.terminalId);
-                          onClose();
-                        }}
-                        title="Accéder à ce terminal"
-                      >
-                        👁️ Aller au terminal
-                      </button>
-
-                      <button
-                        type="button"
-                        className="supervisor-btn supervisor-btn--bye"
-                        onClick={() => handleSendBye(session.vaultId, session.terminalId)}
-                        title="Envoyer '_bye' pour clôturer la session"
-                      >
-                        👋 Envoyer _bye
-                      </button>
-
-                      <button
-                        type="button"
-                        className="supervisor-btn supervisor-btn--kill"
-                        onClick={() => handleKill(session.vaultId, session.terminalId)}
-                        title="Arrêter le terminal (Kill)"
-                      >
-                        ☠️ Kill
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {activeSessions.map((session) => (
+                <VigileCard
+                  key={`${session.vaultId}-${session.terminalId}`}
+                  session={session}
+                  vault={getVault(session.vaultId)}
+                  term={getTerminal(session.terminalId)}
+                  onFocus={() => {
+                    onSelectSession(session.vaultId, session.terminalId);
+                    onClose();
+                  }}
+                  onToast={(msg) => {
+                    setToastMessage(msg);
+                    setTimeout(() => setToastMessage(''), 3000);
+                  }}
+                  onRefresh={fetchSessions}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -1189,7 +1234,81 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
   );
 }
 
+function VigileStandalonePage() {
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [vaults, setVaults] = useState([]);
+  const [terminalButtons, setTerminalButtons] = useState(DEFAULT_TERMINAL_BUTTONS);
+  const [loading, setLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const list = await window.electronAPI.terminal.listActive();
+      setActiveSessions(list || []);
+    } catch {
+      setActiveSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.electronAPI.getSettings().then((s) => setTerminalButtons(s.terminalButtons || DEFAULT_TERMINAL_BUTTONS)).catch(() => {});
+    window.electronAPI.getVaults().then((v) => setVaults(v.vaults || [])).catch(() => {});
+    fetchSessions();
+    const interval = setInterval(fetchSessions, 1000);
+    return () => clearInterval(interval);
+  }, [fetchSessions]);
+
+  const getVault = (vaultId) => vaults.find((v) => v.id === vaultId || v.name === vaultId);
+  const getTerminal = (termId) => terminalButtons.find((t) => t.id === termId);
+
+  return (
+    <div className="vigile-standalone-container">
+      <header className="vigile-standalone-header">
+        <div className="options-modal-title">
+          <span>Vigile - Terminaux actifs</span>
+        </div>
+        <button type="button" className="options-btn options-btn--secondary" onClick={fetchSessions} style={{ padding: '4px 10px', fontSize: '12px' }}>
+          🔄 Refresh
+        </button>
+      </header>
+
+      <main className="vigile-standalone-body">
+        {toastMessage && <div className="supervisor-toast">{toastMessage}</div>}
+
+        {loading ? (
+          <div className="supervisor-empty">Chargement des sessions...</div>
+        ) : activeSessions.length === 0 ? (
+          <div className="supervisor-empty">Aucun terminal actif pour le moment.</div>
+        ) : (
+          <div className="supervisor-list">
+            {activeSessions.map((session) => (
+              <VigileCard
+                key={`${session.vaultId}-${session.terminalId}`}
+                session={session}
+                vault={getVault(session.vaultId)}
+                term={getTerminal(session.terminalId)}
+                onFocus={() => window.electronAPI.focusSession(session.vaultId, session.terminalId)}
+                onToast={(msg) => {
+                  setToastMessage(msg);
+                  setTimeout(() => setToastMessage(''), 3000);
+                }}
+                onRefresh={fetchSessions}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
+  if (typeof window !== 'undefined' && window.location.hash === '#vigile') {
+    return <VigileStandalonePage />;
+  }
+
   const [vaults, setVaults] = useState([]);
   const [root, setRoot] = useState('');
   const [activeVaultId, setActiveVaultId] = useState('');
@@ -1212,6 +1331,15 @@ export default function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [activeTerminalId, setActiveTerminalId] = useState('');
   const [terminalButtons, setTerminalButtons] = useState(DEFAULT_TERMINAL_BUTTONS);
+
+  useEffect(() => {
+    if (!window.electronAPI?.onFocusSession) return undefined;
+    return window.electronAPI.onFocusSession((vaultId, terminalId) => {
+      setActiveVaultId(vaultId);
+      setActiveTerminalId(terminalId);
+      setView('terminal');
+    });
+  }, []);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -1437,7 +1565,20 @@ export default function App() {
             <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Déplier dossiers'}</button>
             <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>
             <button id="settings-btn" className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`} aria-label="Options" title="Options" onClick={() => setOptionsOpen(true)}><GearIcon /></button>
-            <button type="button" className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`} title="Vigile des terminaux" onClick={() => setSupervisorOpen(true)}>Vigile</button>
+            <button
+              type="button"
+              className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`}
+              title="Vigile des terminaux"
+              onClick={() => {
+                if (window.electronAPI?.openVigile) {
+                  window.electronAPI.openVigile();
+                } else {
+                  setSupervisorOpen(true);
+                }
+              }}
+            >
+              Vigile
+            </button>
           </nav>
           <div className="top-title">
             <strong>{activeVault?.name || 'No vault'}</strong>

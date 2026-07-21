@@ -8,7 +8,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
   getGraph: (vaultId) => ipcRenderer.invoke('graph:get', vaultId),
-  pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory'),
+  openVigile: () => ipcRenderer.send('vigile:open'),
+  focusSession: (vaultId, terminalId) => ipcRenderer.send('terminal:focusSession', vaultId, terminalId),
+  onFocusSession: (callback) => {
+    const handler = (event, vaultId, terminalId) => callback(vaultId, terminalId);
+    ipcRenderer.on('terminal:focusSession', handler);
+    return () => ipcRenderer.off('terminal:focusSession', handler);
+  },
   terminal: {
     create: (vaultId, terminalId, cols, rows) => ipcRenderer.invoke('terminal:create', vaultId, terminalId, cols, rows),
     listActive: () => ipcRenderer.invoke('terminal:listActive'),

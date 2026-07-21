@@ -46,6 +46,40 @@ function createWindow() {
   }
 }
 
+let vigileWindow = null;
+
+function createVigileWindow() {
+  if (vigileWindow) {
+    if (vigileWindow.isMinimized()) vigileWindow.restore();
+    vigileWindow.focus();
+    return;
+  }
+
+  const iconPath = getAppIconPath();
+  vigileWindow = new BrowserWindow({
+    title: 'Vigile - Terminaux actifs',
+    ...(iconPath ? { icon: iconPath } : {}),
+    width: 660,
+    height: 540,
+    resizable: true,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (process.env.ELECTRON_RENDERER_URL) {
+    vigileWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}#vigile`);
+  } else {
+    vigileWindow.loadFile(path.join(__dirname, '../renderer/index.html'), { hash: 'vigile' });
+  }
+
+  vigileWindow.on('closed', () => {
+    vigileWindow = null;
+  });
+}
+
 const ptyProcesses = new Map();
 
 function getShell() {
@@ -179,6 +213,18 @@ app.whenReady().then(() => {
     const ptyProcess = ptyProcesses.get(key);
     if (ptyProcess) ptyProcess.kill();
     ptyProcesses.delete(key);
+  });
+
+  ipcMain.on('vigile:open', () => {
+    createVigileWindow();
+  });
+
+  ipcMain.on('terminal:focusSession', (event, vaultId, terminalId) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      mainWindow.webContents.send('terminal:focusSession', vaultId, terminalId);
+    }
   });
 
   createWindow();
