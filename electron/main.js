@@ -116,7 +116,7 @@ app.whenReady().then(() => {
     return result.filePaths[0];
   });
 
-  const terminalKey = (vaultId, terminalId) => `${vaultId}\0${terminalId}`;
+  const terminalKey = (vaultId, terminalId) => `${vaultId}::${terminalId}`;
 
   ipcMain.handle('terminal:create', (event, vaultId, terminalId, cols = 80, rows = 30) => {
     const key = terminalKey(vaultId, terminalId);
@@ -168,7 +168,7 @@ app.whenReady().then(() => {
   ipcMain.handle('terminal:listActive', () => {
     const list = [];
     for (const [key] of ptyProcesses.entries()) {
-      const [vaultId, terminalId] = key.split('\0');
+      const [vaultId, terminalId] = key.split('::');
       list.push({ vaultId, terminalId });
     }
     return list;

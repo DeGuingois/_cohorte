@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css';
 
 const sessionBuffers = new Map();
 const startedSessions = new Set();
-const sessionKey = (vaultId, terminalId) => `${vaultId}\0${terminalId}`;
+const sessionKey = (vaultId, terminalId) => `${vaultId}::${terminalId}`;
 
 export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKill }) {
   const domRef = useRef(null);
