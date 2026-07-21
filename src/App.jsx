@@ -1,24 +1,48 @@
 import { useEffect, useMemo, useState } from 'react';
-import adaAvatar from './avatars/ada.png';
-import bobbAvatar from './avatars/bobb.png';
-import eliAvatar from './avatars/eli.png';
-import kiraAvatar from './avatars/kira.png';
-import miloAvatar from './avatars/milo.png';
-import zoeAvatar from './avatars/zoe.png';
-import cohorteIcon from './avatars/cohorte_icon.png';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
 import TerminalPanel from './TerminalPanel.jsx';
 
-const avatars = {
-  ada: adaAvatar,
-  bobb: bobbAvatar,
-  eli: eliAvatar,
-  kira: kiraAvatar,
-  milo: miloAvatar,
-  zoe: zoeAvatar,
-  cohorte: cohorteIcon,
-};
+const avatarModules = import.meta.glob('./avatars/*.png', { eager: true, import: 'default' });
+
+const avatars = {};
+for (const pathKey in avatarModules) {
+  const filename = pathKey.split('/').pop();
+  const name = filename.replace(/\.png$/i, '');
+  avatars[name] = avatarModules[pathKey];
+  const normalizedKey = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!avatars[normalizedKey]) {
+    avatars[normalizedKey] = avatarModules[pathKey];
+  }
+}
+
+function getAvatarSrc(vault) {
+  if (!vault) return avatars.ada || Object.values(avatars)[0];
+
+  if (vault.avatar && avatars[vault.avatar]) {
+    return avatars[vault.avatar];
+  }
+
+  if (vault.avatar) {
+    const normAvatar = vault.avatar.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (avatars[normAvatar]) return avatars[normAvatar];
+  }
+
+  const vaultName = vault.name || vault.id || '';
+  const normVaultName = vaultName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const matches = Object.keys(avatars).filter((key) => {
+    const normKey = key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normVaultName.includes(normKey);
+  });
+
+  if (matches.length > 0) {
+    matches.sort((a, b) => b.length - a.length);
+    return avatars[matches[0]];
+  }
+
+  return avatars.ada || Object.values(avatars)[0];
+}
 
 const VAULT_ORDER_KEY = 'vault-order';
 const DEFAULT_TERMINAL_BUTTONS = [{ id: 'codex', label: 'Codex', command: 'codex' }, { id: 'gemini', label: 'Gemini', command: 'agy' }];
@@ -503,7 +527,7 @@ function VaultRail({ vaults, activeVault, onSelectVault, onReorderVaults }) {
           onDragEnd={() => setDraggingVaultId('')}
           title={vault.name}
         >
-          <img src={avatars[vault.avatar] || adaAvatar} alt="" />
+          <img src={getAvatarSrc(vault)} alt="" draggable={false} />
         </button>
       ))}
     </nav>
@@ -806,8 +830,13 @@ function Properties({ properties, activeVault, onOpenFile, onTag }) {
 }
 
 function MarkdownEditor({ note, content, setContent, saving, dirty, onSave, activeVault, onOpenFile, onTag }) {
+  const [editorMode, setEditorMode] = useState('preview');
   const parsed = useMemo(() => splitFrontmatter(content), [content]);
   const title = titleFromNote(note, parsed.body);
+
+  useEffect(() => {
+    setEditorMode('preview');
+  }, [note?.path]);
 
   if (!note) {
     return (
@@ -816,6 +845,10 @@ function MarkdownEditor({ note, content, setContent, saving, dirty, onSave, acti
       </main>
     );
   }
+
+  const handleBodyChange = (nextBody) => {
+    setContent(replaceMarkdownBody(content, nextBody));
+  };
 
   return (
     <main className="editor-pane">
@@ -827,24 +860,76 @@ function MarkdownEditor({ note, content, setContent, saving, dirty, onSave, acti
         <div className="note-breadcrumb">{note.path.replace(/\.md$/i, '').split('/').map((part, index, parts) => (
           <span key={`${part}-${index}`}>{part}{index < parts.length - 1 ? ' / ' : ''}</span>
         ))}</div>
+        <div className="note-mode-toggle">
+          <button
+            type="button"
+            className={`mode-btn ${editorMode === 'edit' ? 'is-active' : ''}`}
+            onClick={() => setEditorMode('edit')}
+            title="Éditeur texte brut"
+          >
+            ✏️ Édition
+          </button>
+          <button
+            type="button"
+            className={`mode-btn ${editorMode === 'preview' ? 'is-active' : ''}`}
+            onClick={() => setEditorMode('preview')}
+            title="Aperçu rendu"
+          >
+            👁️ Aperçu
+          </button>
+          <button
+            type="button"
+            className={`mode-btn ${editorMode === 'live' ? 'is-active' : ''}`}
+            onClick={() => setEditorMode('live')}
+            title="Édition et rendu côte à côte"
+          >
+            🌗 Scindé
+          </button>
+        </div>
         <div className="note-actions">
           <span className={dirty ? 'dirty is-dirty' : 'dirty'}>{dirty ? 'Unsaved' : 'Saved'}</span>
           <button onClick={onSave} disabled={saving || !dirty}>{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </header>
-      <section className="note-workspace">
-        <div className="obsidian-note">
-          <h1>{title}</h1>
-          <Properties properties={parsed.frontmatter} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
-        </div>
-        <MarkdownDocument
-          body={parsed.body}
-          title={title}
-          onChange={(nextBody) => setContent(replaceMarkdownBody(content, nextBody))}
-          activeVault={activeVault}
-          onOpenFile={onOpenFile}
-          onTag={onTag}
-        />
+      <section className={`note-workspace mode-${editorMode}`}>
+        {(editorMode === 'edit' || editorMode === 'live') && (
+          <div className="note-editor-wrapper">
+            <div className="obsidian-note">
+              <h1>{title}</h1>
+              <Properties properties={parsed.frontmatter} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
+            </div>
+            <textarea
+              className="note-raw-textarea"
+              value={parsed.body}
+              onChange={(e) => handleBodyChange(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                  e.preventDefault();
+                  onSave?.();
+                }
+              }}
+              placeholder="Saisissez votre note Markdown ici..."
+              spellCheck={false}
+            />
+          </div>
+        )}
+        {(editorMode === 'preview' || editorMode === 'live') && (
+          <div className="note-preview-wrapper">
+            {editorMode === 'preview' && (
+              <div className="obsidian-note">
+                <h1>{title}</h1>
+                <Properties properties={parsed.frontmatter} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
+              </div>
+            )}
+            <MarkdownDocument
+              body={parsed.body}
+              title={title}
+              activeVault={activeVault}
+              onOpenFile={onOpenFile}
+              onTag={onTag}
+            />
+          </div>
+        )}
       </section>
     </main>
   );
@@ -1107,18 +1192,23 @@ export default function App() {
   function selectVault(vault) {
     setActiveVaultId(vault.id);
     setActivePath(vault.files[0]?.path || '');
-    setView('graph');
+    setView('note');
     setGraph(null);
     setQuery('');
   }
 
   function reorderVaults(sourceVaultId, targetVaultId) {
     setVaultOrder((currentOrder) => {
-      const currentIds = currentOrder.length ? currentOrder : vaults.map((vault) => vault.id);
-      const availableIds = new Set(vaults.map((vault) => vault.id));
-      const nextOrder = currentIds.filter((vaultId) => availableIds.has(vaultId) && vaultId !== sourceVaultId);
+      const byId = new Map(vaults.map((v) => [v.id, v]));
+      const orderedIds = currentOrder.filter((vId) => byId.has(vId));
+      const knownIds = new Set(orderedIds);
+      const missingIds = vaults.map((v) => v.id).filter((vId) => !knownIds.has(vId));
+      const fullOrder = [...orderedIds, ...missingIds];
+
+      const nextOrder = fullOrder.filter((vId) => vId !== sourceVaultId);
       const targetIndex = nextOrder.indexOf(targetVaultId);
       if (targetIndex === -1) return currentOrder;
+
       nextOrder.splice(targetIndex, 0, sourceVaultId);
       localStorage.setItem(VAULT_ORDER_KEY, JSON.stringify(nextOrder));
       return nextOrder;

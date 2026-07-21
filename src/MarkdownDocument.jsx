@@ -244,59 +244,57 @@ function InlineAtom({ text, activeVault, onOpenFile, onTag }) {
   });
 }
 
-function EditableAtom({ tag: Tag = 'div', className, block, activeVault, onOpenFile, onTag, onCommit, children }) {
-  return (
-    <Tag
-      className={className}
-      contentEditable
-      suppressContentEditableWarning
-      spellCheck={false}
-      data-atomic-kind={block.kind}
-      data-source-index={block.index}
-      onBlur={(event) => {
-        const nextText = event.currentTarget.innerText.replace(/\n/g, '');
-        if (nextText !== plainInlineText(block.text)) onCommit(block, nextText);
-      }}
-    >
-      {children || <InlineAtom text={block.text} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />}
-    </Tag>
-  );
-}
-
-function MarkdownHeading({ block, activeVault, onOpenFile, onTag, onCommit }) {
-  const Tag = `h${block.visualLevel}`;
-  return (
-    <EditableAtom
-      tag={Tag}
-      className={`atom-md-block atom-md-heading atom-md-heading-${block.visualLevel}`}
-      block={block}
-      activeVault={activeVault}
-      onOpenFile={onOpenFile}
-      onTag={onTag}
-      onCommit={onCommit}
-    />
-  );
-}
-
-function MarkdownLineBlock({ block, activeVault, onOpenFile, onTag, onCommit }) {
+function MarkdownLineBlock({ block, activeVault, onOpenFile, onTag }) {
   if (block.kind === 'heading') {
-    return <MarkdownHeading block={block} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} onCommit={onCommit} />;
+    const Tag = `h${block.visualLevel}`;
+    return (
+      <Tag className={`atom-md-block atom-md-heading atom-md-heading-${block.visualLevel}`}>
+        <InlineAtom text={block.text} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
+      </Tag>
+    );
   }
+
   if (block.kind === 'divider') return <div className="atom-md-divider" data-atomic-kind="divider" />;
 
+  if (block.kind === 'quote') {
+    return (
+      <blockquote className="atom-md-block atom-md-quote">
+        <InlineAtom text={block.text} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
+      </blockquote>
+    );
+  }
+
+  if (block.kind === 'task') {
+    const isChecked = /^-\s+\[[xX]\]/.test(block.raw);
+    return (
+      <div className="atom-md-block atom-md-task">
+        <input type="checkbox" checked={isChecked} readOnly />
+        <span><InlineAtom text={block.text} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} /></span>
+      </div>
+    );
+  }
+
+  if (block.kind === 'list') {
+    return (
+      <div className="atom-md-block atom-md-list">
+        <span className="atom-md-list-bullet">•</span>
+        <span><InlineAtom text={block.text} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} /></span>
+      </div>
+    );
+  }
+
+  if (block.kind === 'empty') {
+    return <div className="atom-md-block atom-md-empty" style={{ height: '0.8em' }} />;
+  }
+
   return (
-    <EditableAtom
-      className={`atom-md-block atom-md-${block.kind}`}
-      block={block}
-      activeVault={activeVault}
-      onOpenFile={onOpenFile}
-      onTag={onTag}
-      onCommit={onCommit}
-    />
+    <p className="atom-md-block atom-md-paragraph">
+      <InlineAtom text={block.text} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
+    </p>
   );
 }
 
-function MarkdownTable({ block, body, onChange, activeVault, onOpenFile, onTag }) {
+function MarkdownTable({ block, activeVault, onOpenFile, onTag }) {
   const header = splitEscapedPipes(block.rows[0]);
   const align = splitEscapedPipes(block.rows[1]).map((cell) => {
     if (/^:-+:$/.test(cell)) return 'center';
@@ -304,15 +302,6 @@ function MarkdownTable({ block, body, onChange, activeVault, onOpenFile, onTag }
     return 'left';
   });
   const rows = block.rows.slice(2).map(splitEscapedPipes);
-
-  function updateCell(rowIndex, cellIndex, value) {
-    const lines = body.split(/\r?\n/);
-    const lineIndex = block.start + rowIndex;
-    const cells = splitEscapedPipes(lines[lineIndex]);
-    cells[cellIndex] = value;
-    lines[lineIndex] = `| ${cells.map(escapeTableCell).join(' | ')} |`;
-    onChange(lines.join('\n'));
-  }
 
   return (
     <div className="atom-md-table-wrap" data-atomic-kind="table">
@@ -331,18 +320,7 @@ function MarkdownTable({ block, body, onChange, activeVault, onOpenFile, onTag }
             <tr key={`row-${rowIndex}`}>
               {header.map((_, cellIndex) => (
                 <td key={`cell-${rowIndex}-${cellIndex}`} style={{ textAlign: align[cellIndex] || 'left' }}>
-                  <div
-                    contentEditable
-                    suppressContentEditableWarning
-                    spellCheck={false}
-                    onBlur={(event) => {
-                      const nextText = event.currentTarget.innerText.replace(/\n/g, ' ');
-                      const previousText = row[cellIndex] || '';
-                      if (nextText !== plainInlineText(previousText)) updateCell(rowIndex + 2, cellIndex, nextText);
-                    }}
-                  >
-                    <InlineAtom text={row[cellIndex] || ''} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
-                  </div>
+                  <InlineAtom text={row[cellIndex] || ''} activeVault={activeVault} onOpenFile={onOpenFile} onTag={onTag} />
                 </td>
               ))}
             </tr>
@@ -353,36 +331,15 @@ function MarkdownTable({ block, body, onChange, activeVault, onOpenFile, onTag }
   );
 }
 
-function MarkdownCodeBlock({ block, body, onChange }) {
-  function updateCode(nextText) {
-    const lines = body.split(/\r?\n/);
-    const replacement = [
-      block.opening,
-      ...nextText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'),
-      block.closing,
-    ];
-    lines.splice(block.start, block.end - block.start + 1, ...replacement);
-    onChange(lines.join('\n'));
-  }
-
+function MarkdownCodeBlock({ block }) {
   return (
     <pre className="atom-md-code-block" data-atomic-kind="codeBlock">
-      <code
-        contentEditable
-        suppressContentEditableWarning
-        spellCheck={false}
-        onBlur={(event) => {
-          const nextText = event.currentTarget.innerText.replace(/\n$/, '');
-          if (nextText !== block.text) updateCode(nextText);
-        }}
-      >
-        {block.text}
-      </code>
+      <code>{block.text}</code>
     </pre>
   );
 }
 
-export default function MarkdownDocument({ body, title, onChange, activeVault, onOpenFile, onTag }) {
+export default function MarkdownDocument({ body, title, activeVault, onOpenFile, onTag }) {
   const blocks = useMemo(() => parseDocument(body), [body]);
   const visibleBlocks = useMemo(() => {
     const firstContent = blocks.find((block) => block.kind !== 'empty');
@@ -390,40 +347,29 @@ export default function MarkdownDocument({ body, title, onChange, activeVault, o
     return firstContent.text.trim() === title.trim() ? blocks.filter((block) => block !== firstContent) : blocks;
   }, [blocks, title]);
 
-  function commitBlock(block, nextText) {
-    const lines = body.split(/\r?\n/);
-    lines[block.index] = `${block.prefix || ''}${nextText}`;
-    onChange(lines.join('\n'));
-  }
-
   return (
     <section className="atomic-markdown" data-renderer-version={rendererVersion}>
-      {visibleBlocks.map((block) => (
+      {visibleBlocks.map((block, i) => (
         block.kind === 'codeBlock' ? (
           <MarkdownCodeBlock
-            key={`code-${block.start}`}
+            key={`code-${block.start}-${i}`}
             block={block}
-            body={body}
-            onChange={onChange}
           />
         ) : block.kind === 'table' ? (
           <MarkdownTable
-            key={`table-${block.start}`}
+            key={`table-${block.start}-${i}`}
             block={block}
-            body={body}
-            onChange={onChange}
             activeVault={activeVault}
             onOpenFile={onOpenFile}
             onTag={onTag}
           />
         ) : (
           <MarkdownLineBlock
-            key={`${block.index}-${block.kind}`}
+            key={`${block.index}-${block.kind}-${i}`}
             block={block}
             activeVault={activeVault}
             onOpenFile={onOpenFile}
             onTag={onTag}
-            onCommit={commitBlock}
           />
         )
       ))}

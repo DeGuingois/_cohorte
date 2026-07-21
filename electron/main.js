@@ -118,13 +118,23 @@ app.whenReady().then(() => {
 
   const terminalKey = (vaultId, terminalId) => `${vaultId}\0${terminalId}`;
 
-  ipcMain.handle('terminal:create', (event, vaultId, terminalId) => {
+  ipcMain.handle('terminal:create', (event, vaultId, terminalId, cols = 80, rows = 30) => {
     const key = terminalKey(vaultId, terminalId);
     if (ptyProcesses.has(key)) return { vaultId, terminalId, exists: true };
 
     const vault = findVault(vaultId);
+    const env = {
+      ...process.env,
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    };
+
     const ptyProcess = pty.spawn(getShell(), [], {
-      name: 'xterm-color', cols: 80, rows: 30, cwd: vault.path, env: process.env
+      name: 'xterm-256color',
+      cols: Math.max(cols || 80, 20),
+      rows: Math.max(rows || 30, 5),
+      cwd: vault.path,
+      env,
     });
     ptyProcess.onData((data) => mainWindow.webContents.send('terminal:data', vaultId, terminalId, data));
     ptyProcess.onExit(() => {

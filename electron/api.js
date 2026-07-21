@@ -42,9 +42,49 @@ function slug(value) {
     .replace(/^-+|-+$/g, '') || 'vault';
 }
 
+function getAvailableAvatarNames() {
+  const possibleDirs = [
+    path.resolve('./src/avatars'),
+    path.resolve('../src/avatars'),
+  ];
+  for (const dir of possibleDirs) {
+    if (fs.existsSync(dir)) {
+      try {
+        const files = fs.readdirSync(dir);
+        const avatarNames = files
+          .filter((f) => f.toLowerCase().endsWith('.png') && f !== 'cohorte_icon.png')
+          .map((f) => path.basename(f, '.png'));
+        if (avatarNames.length > 0) return avatarNames;
+      } catch { /* ignore */ }
+    }
+  }
+  return ['11', '3', '4', '5', 'ada', 'archiviste', 'bobb', 'comptable', 'coordinateur', 'detracteur', 'développeur', 'eli', 'enseignant', 'entraineur', 'hacker', 'kira', 'milo', 'philosophe', 'protecteur', 'rédacteur', 'voyageur', 'zoe'];
+}
+
 function vaultAvatar(name) {
-  const normalized = slug(name);
-  return ['ada', 'bobb', 'eli', 'kira', 'milo', 'zoe'].find((avatar) => normalized.includes(avatar)) || 'ada';
+  if (!name) return 'ada';
+
+  const rawLower = name.toLowerCase();
+  const normVault = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const availableAvatars = getAvailableAvatarNames();
+
+  const exact = availableAvatars.find((av) => {
+    const normAv = av.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return rawLower === av.toLowerCase() || normVault === normAv;
+  });
+  if (exact) return exact;
+
+  const matches = availableAvatars.filter((av) => {
+    const normAv = av.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normVault.includes(normAv) || normAv.includes(normVault);
+  });
+
+  if (matches.length > 0) {
+    matches.sort((a, b) => b.length - a.length);
+    return matches[0];
+  }
+
+  return 'ada';
 }
 
 export function safeResolve(base, relativePath = '') {
@@ -65,27 +105,62 @@ export function safeResolve(base, relativePath = '') {
   return resolved;
 }
 
-function walkMarkdown(root, dir = root) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  return entries.flatMap((entry) => {
-    if (entry.name === '.git' || entry.name === '.obsidian' || entry.name === 'node_modules') return [];
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) return walkMarkdown(root, fullPath);
-    if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) return [];
-    const stat = fs.statSync(fullPath);
-    const relPath = path.relative(root, fullPath).replace(/\\/g, '/');
-    return [{
-      path: relPath,
-      name: path.basename(entry.name, '.md'),
-      folder: path.dirname(relPath) === '.' ? '/' : path.dirname(relPath).replace(/\\/g, '/'),
-      modified: stat.mtime.toISOString(),
-      size: stat.size,
-    }];
-  });
+function scanVault(root) {
+  const files = [];
+  const folders = [];
+
+  function walk(currentDir) {
+    const relDir = path.relative(root, currentDir).replace(/\\/g, '/');
+    if (relDir && relDir !== '.') {
+      folders.push(relDir);
+    }
+    try {
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name === '.git' || entry.name === '.obsidian' || entry.name === 'node_modules') continue;
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath);
+        } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
+          const stat = fs.statSync(fullPath);
+          const relPath = path.relative(root, fullPath).replace(/\\/g, '/');
+          files.push({
+            path: relPath,
+            name: path.basename(entry.name, '.md'),
+            folder: path.dirname(relPath) === '.' ? '/' : path.dirname(relPath).replace(/\\/g, '/'),
+            modified: stat.mtime.toISOString(),
+            size: stat.size,
+          });
+        }
+      }
+    } catch { /* ignore unreadable dirs */ }
+  }
+
+  walk(root);
+  return { files, folders };
 }
 
-function buildTree(files) {
+function walkMarkdown(root) {
+  return scanVault(root).files;
+}
+
+function buildTree(files, folders = []) {
   const root = { type: 'folder', name: '/', path: '', children: [] };
+
+  for (const folderPath of folders) {
+    const parts = folderPath.split('/');
+    let cursor = root;
+    parts.forEach((part, index) => {
+      const currentPath = parts.slice(0, index + 1).join('/');
+      let child = cursor.children.find((item) => item.name === part && item.type === 'folder');
+      if (!child) {
+        child = { type: 'folder', name: part, path: currentPath, children: [] };
+        cursor.children.push(child);
+      }
+      cursor = child;
+    });
+  }
+
   for (const file of files) {
     const parts = file.path.split('/');
     let cursor = root;
@@ -139,7 +214,8 @@ export function getVaults() {
     .filter((entry) => entry.isDirectory() && entry.name !== '.git')
     .map((entry, index) => {
       const vaultPath = path.join(vaultsRoot, entry.name);
-      const files = walkMarkdown(vaultPath).sort((a, b) => a.path.localeCompare(b.path));
+      const { files, folders } = scanVault(vaultPath);
+      files.sort((a, b) => a.path.localeCompare(b.path));
       return {
         id: slug(entry.name),
         name: entry.name,
@@ -147,7 +223,7 @@ export function getVaults() {
         avatar: vaultAvatar(entry.name),
         notes: files.length,
         files,
-        tree: buildTree(files),
+        tree: buildTree(files, folders),
         active: index === 0,
       };
     });
@@ -161,7 +237,8 @@ export function findVault(vaultId) {
 
 export function getGraph(vaultId) {
   const vault = findVault(vaultId);
-  const files = walkMarkdown(vault.path).sort((a, b) => a.path.localeCompare(b.path));
+  const { files } = scanVault(vault.path);
+  files.sort((a, b) => a.path.localeCompare(b.path));
   const graphFiles = files.map((file) => {
     const fullPath = safeResolve(vault.path, file.path);
     return { ...file, content: fs.readFileSync(fullPath, 'utf8') };

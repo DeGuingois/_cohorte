@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getGraph: (vaultId) => ipcRenderer.invoke('graph:get', vaultId),
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory'),
   terminal: {
-    create: (vaultId, terminalId) => ipcRenderer.invoke('terminal:create', vaultId, terminalId),
+    create: (vaultId, terminalId, cols, rows) => ipcRenderer.invoke('terminal:create', vaultId, terminalId, cols, rows),
     input: (vaultId, terminalId, data) => ipcRenderer.send('terminal:input', vaultId, terminalId, data),
     resize: (vaultId, terminalId, cols, rows) => ipcRenderer.send('terminal:resize', vaultId, terminalId, cols, rows),
     kill: (vaultId, terminalId) => ipcRenderer.send('terminal:kill', vaultId, terminalId),

@@ -97,13 +97,14 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
     const switchId = ++switchRef.current;
     activeSessionRef.current = { vaultId, terminalId, key };
     xtermRef.current.reset();
-    xtermRef.current.write(`\x1b[2mOuverture de ${terminal.label} dans ${vaultId}…\x1b[0m\r\n`);
+    fitRef.current?.fit();
+    const dims = fitRef.current?.proposeDimensions() || { cols: 80, rows: 30 };
 
-    window.electronAPI.terminal.create(vaultId, terminalId).then(({ exists }) => {
+    window.electronAPI.terminal.create(vaultId, terminalId, dims.cols, dims.rows).then(({ exists }) => {
       if (switchId !== switchRef.current || activeSessionRef.current.key !== key) return;
       xtermRef.current.reset();
+      fitRef.current?.fit();
       if (sessionBuffers.get(key)) xtermRef.current.write(sessionBuffers.get(key));
-      requestAnimationFrame(() => fitRef.current?.fit());
 
       if (!exists && !startedSessions.has(key)) {
         startedSessions.add(key);
@@ -119,13 +120,27 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
   }, [activeVaultId, terminal?.id, isVisible]);
 
   useEffect(() => {
-    if (!isVisible) return undefined;
-    const fit = () => fitRef.current?.fit();
-    const frame = requestAnimationFrame(fit);
-    window.addEventListener('resize', fit);
+    if (!isVisible || !domRef.current) return undefined;
+
+    const doFit = () => {
+      try {
+        fitRef.current?.fit();
+        const { cols, rows } = xtermRef.current || {};
+        const { vaultId, terminalId } = activeSessionRef.current;
+        if (vaultId && terminalId && cols && rows) {
+          window.electronAPI.terminal.resize(vaultId, terminalId, cols, rows);
+        }
+      } catch { /* ignore */ }
+    };
+
+    doFit();
+    const observer = new ResizeObserver(() => doFit());
+    observer.observe(domRef.current);
+    window.addEventListener('resize', doFit);
+
     return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('resize', fit);
+      observer.disconnect();
+      window.removeEventListener('resize', doFit);
     };
   }, [isVisible]);
 
