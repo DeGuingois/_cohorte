@@ -1159,6 +1159,9 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
   const [activeSessions, setActiveSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
+  const [pos, setPos] = useState({ x: 120, y: 70 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 120, posY: 70 });
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -1177,19 +1180,45 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
     return () => clearInterval(interval);
   }, [fetchSessions]);
 
-  const handleBackdropClick = (event) => {
-    if (event.target === event.currentTarget) onClose();
+  const handleHeaderMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('input')) return;
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      posX: pos.x,
+      posY: pos.y,
+    };
   };
+
+  useEffect(() => {
+    if (!isDragging) return undefined;
+    const handleMouseMove = (e) => {
+      const dx = e.clientX - dragStartRef.current.mouseX;
+      const dy = e.clientY - dragStartRef.current.mouseY;
+      setPos({
+        x: Math.max(10, dragStartRef.current.posX + dx),
+        y: Math.max(10, dragStartRef.current.posY + dy),
+      });
+    };
+    const handleMouseUp = () => setIsDragging(false);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   const getVault = (vaultId) => vaults.find((v) => v.id === vaultId || v.name === vaultId);
   const getTerminal = (termId) => terminalButtons.find((t) => t.id === termId);
 
   return (
-    <div className="options-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-label="Vigile">
-      <div className="options-modal supervisor-modal">
-        <div className="options-modal-header">
+    <div className="supervisor-floating-wrapper" style={{ position: 'fixed', left: `${pos.x}px`, top: `${pos.y}px`, zIndex: 9999 }}>
+      <div className="options-modal supervisor-modal" style={{ boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
+        <div className="options-modal-header supervisor-drag-handle" onMouseDown={handleHeaderMouseDown} style={{ cursor: 'move', userSelect: 'none' }}>
           <div className="options-modal-title">
-            <span>Vigile - Terminaux actifs</span>
+            <span>✋ Vigile - Terminaux actifs</span>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button type="button" className="options-btn options-btn--secondary" onClick={fetchSessions} style={{ padding: '2px 8px', fontSize: '11px' }} title="Rafraîchir">
@@ -1586,10 +1615,9 @@ export default function App() {
               className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`}
               title="Vigile des terminaux"
               onClick={() => {
+                setSupervisorOpen((prev) => !prev);
                 if (window.electronAPI?.openVigile) {
                   window.electronAPI.openVigile();
-                } else {
-                  setSupervisorOpen(true);
                 }
               }}
             >

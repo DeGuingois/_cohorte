@@ -69,14 +69,10 @@ function createVigileWindow() {
     },
   });
 
-  if (mainWindow && mainWindow.webContents && mainWindow.webContents.getURL()) {
-    const mainUrl = mainWindow.webContents.getURL().split('#')[0];
-    const devUrl = mainUrl.endsWith('/') ? `${mainUrl}#vigile` : `${mainUrl}/#vigile`;
-    vigileWindow.loadURL(devUrl);
-  } else if (process.env.ELECTRON_RENDERER_URL) {
+  if (process.env.ELECTRON_RENDERER_URL) {
     const rawUrl = process.env.ELECTRON_RENDERER_URL;
-    const devUrl = rawUrl.endsWith('/') ? `${rawUrl}#vigile` : `${rawUrl}/#vigile`;
-    vigileWindow.loadURL(devUrl);
+    const baseUrl = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
+    vigileWindow.loadURL(`${baseUrl}#vigile`);
   } else {
     vigileWindow.loadFile(path.join(__dirname, '../renderer/index.html'), { hash: 'vigile' });
   }
