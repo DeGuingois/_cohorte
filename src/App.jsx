@@ -1240,12 +1240,19 @@ function VigileStandalonePage() {
   const [terminalButtons, setTerminalButtons] = useState(DEFAULT_TERMINAL_BUTTONS);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
+  const [errMessage, setErrMessage] = useState('');
 
   const fetchSessions = useCallback(async () => {
+    if (!window.electronAPI?.terminal?.listActive) {
+      setActiveSessions([]);
+      setLoading(false);
+      return;
+    }
     try {
       const list = await window.electronAPI.terminal.listActive();
       setActiveSessions(list || []);
-    } catch {
+    } catch (err) {
+      setErrMessage(err.message || 'Erreur chargement des terminaux');
       setActiveSessions([]);
     } finally {
       setLoading(false);
@@ -1253,8 +1260,12 @@ function VigileStandalonePage() {
   }, []);
 
   useEffect(() => {
-    window.electronAPI.getSettings().then((s) => setTerminalButtons(s.terminalButtons || DEFAULT_TERMINAL_BUTTONS)).catch(() => {});
-    window.electronAPI.getVaults().then((v) => setVaults(v.vaults || [])).catch(() => {});
+    if (window.electronAPI?.getSettings) {
+      window.electronAPI.getSettings().then((s) => setTerminalButtons(s?.terminalButtons || DEFAULT_TERMINAL_BUTTONS)).catch(() => {});
+    }
+    if (window.electronAPI?.getVaults) {
+      window.electronAPI.getVaults().then((v) => setVaults(v?.vaults || [])).catch(() => {});
+    }
     fetchSessions();
     const interval = setInterval(fetchSessions, 1000);
     return () => clearInterval(interval);
@@ -1276,6 +1287,7 @@ function VigileStandalonePage() {
 
       <main className="vigile-standalone-body">
         {toastMessage && <div className="supervisor-toast">{toastMessage}</div>}
+        {errMessage && <div className="supervisor-toast" style={{ borderColor: 'red', color: 'red' }}>{errMessage}</div>}
 
         {loading ? (
           <div className="supervisor-empty">Chargement des sessions...</div>
@@ -1289,7 +1301,7 @@ function VigileStandalonePage() {
                 session={session}
                 vault={getVault(session.vaultId)}
                 term={getTerminal(session.terminalId)}
-                onFocus={() => window.electronAPI.focusSession(session.vaultId, session.terminalId)}
+                onFocus={() => window.electronAPI?.focusSession?.(session.vaultId, session.terminalId)}
                 onToast={(msg) => {
                   setToastMessage(msg);
                   setTimeout(() => setToastMessage(''), 3000);
@@ -1305,7 +1317,11 @@ function VigileStandalonePage() {
 }
 
 export default function App() {
-  if (typeof window !== 'undefined' && window.location.hash === '#vigile') {
+  const isVigile = typeof window !== 'undefined' && (
+    window.location.hash.includes('vigile') || window.location.search.includes('vigile')
+  );
+
+  if (isVigile) {
     return <VigileStandalonePage />;
   }
 

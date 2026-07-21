@@ -70,7 +70,9 @@ function createVigileWindow() {
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    vigileWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}#vigile`);
+    const rawUrl = process.env.ELECTRON_RENDERER_URL;
+    const devUrl = rawUrl.endsWith('/') ? `${rawUrl}#vigile` : `${rawUrl}/#vigile`;
+    vigileWindow.loadURL(devUrl);
   } else {
     vigileWindow.loadFile(path.join(__dirname, '../renderer/index.html'), { hash: 'vigile' });
   }
