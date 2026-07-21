@@ -91,6 +91,9 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
       const key = sessionKey(vaultId, terminalId);
       sessionBuffers.delete(key);
       startedSessions.delete(key);
+      if (key === activeSessionRef.current.key && onKill) {
+        onKill();
+      }
     });
 
     return () => {

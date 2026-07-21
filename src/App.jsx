@@ -1387,6 +1387,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!window.electronAPI?.terminal?.onExit) return undefined;
+    return window.electronAPI.terminal.onExit((exVaultId, exTerminalId) => {
+      if (activeVaultId === exVaultId && activeTerminalId === exTerminalId && view === 'terminal') {
+        setView('note');
+      }
+    });
+  }, [activeVaultId, activeTerminalId, view]);
+
+  useEffect(() => {
     if (!isResizing) return;
 
     const handleMouseMove = (e) => {
