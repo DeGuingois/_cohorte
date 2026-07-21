@@ -1275,17 +1275,17 @@ function VigileStandalonePage() {
   const getTerminal = (termId) => terminalButtons.find((t) => t.id === termId);
 
   return (
-    <div className="vigile-standalone-container">
-      <header className="vigile-standalone-header">
-        <div className="options-modal-title">
+    <div className="vigile-standalone-container" style={{ background: '#ffffff', minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <header className="vigile-standalone-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
+        <div className="options-modal-title" style={{ fontWeight: 'bold', fontSize: '15px' }}>
           <span>Vigile - Terminaux actifs</span>
         </div>
-        <button type="button" className="options-btn options-btn--secondary" onClick={fetchSessions} style={{ padding: '4px 10px', fontSize: '12px' }}>
+        <button type="button" className="options-btn options-btn--secondary" onClick={fetchSessions} style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
           🔄 Refresh
         </button>
       </header>
 
-      <main className="vigile-standalone-body">
+      <main className="vigile-standalone-body" style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
         {toastMessage && <div className="supervisor-toast">{toastMessage}</div>}
         {errMessage && <div className="supervisor-toast" style={{ borderColor: 'red', color: 'red' }}>{errMessage}</div>}
 
