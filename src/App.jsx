@@ -1104,12 +1104,11 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
   const getTerminal = (termId) => terminalButtons.find((t) => t.id === termId);
 
   return (
-    <div className="options-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-label="Superviseur">
+    <div className="options-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-label="Vigile">
       <div className="options-modal supervisor-modal">
         <div className="options-modal-header">
           <div className="options-modal-title">
-            <span style={{ fontSize: '18px' }}>🛡️</span>
-            <span>Superviseur des Terminaux</span>
+            <span>Vigile - Terminaux actifs</span>
           </div>
           <button className="options-close" onClick={onClose} aria-label="Fermer">&times;</button>
         </div>
@@ -1432,8 +1431,8 @@ export default function App() {
             ))}
             <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Déplier dossiers'}</button>
             <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>
-            <button type="button" className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`} title="Superviseur des terminaux" onClick={() => setSupervisorOpen(true)}>🛡️ Superviseur</button>
             <button id="settings-btn" className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`} aria-label="Options" title="Options" onClick={() => setOptionsOpen(true)}><GearIcon /></button>
+            <button type="button" className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`} title="Vigile des terminaux" onClick={() => setSupervisorOpen(true)}>Vigile</button>
           </nav>
           <div className="top-title">
             <strong>{activeVault?.name || 'No vault'}</strong>
