@@ -1612,12 +1612,13 @@ export default function App() {
             <button id="settings-btn" className={`top-settings-btn ${optionsOpen ? 'is-active' : ''}`} aria-label="Options" title="Options" onClick={() => setOptionsOpen(true)}><GearIcon /></button>
             <button
               type="button"
-              className={`top-supervisor-btn ${supervisorOpen ? 'is-active' : ''}`}
-              title="Vigile des terminaux"
+              className="top-supervisor-btn"
+              title="Ouvrir le Vigile dans une fenêtre séparée"
               onClick={() => {
-                setSupervisorOpen((prev) => !prev);
                 if (window.electronAPI?.openVigile) {
                   window.electronAPI.openVigile();
+                } else {
+                  setSupervisorOpen((prev) => !prev);
                 }
               }}
             >
