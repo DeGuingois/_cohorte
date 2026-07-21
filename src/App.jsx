@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
 import TerminalPanel from './TerminalPanel.jsx';
