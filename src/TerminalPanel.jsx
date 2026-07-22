@@ -179,7 +179,12 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
           </div>
         </div>
       )}
-      <div ref={domRef} className="terminal-xterm" />
+      <div
+        ref={domRef}
+        className="terminal-xterm"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      />
     </div>
   );
 }
