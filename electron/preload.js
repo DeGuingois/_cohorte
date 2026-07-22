@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   terminal: {
     create: (vaultId, terminalId, cols, rows) => ipcRenderer.invoke('terminal:create', vaultId, terminalId, cols, rows),
     listActive: () => ipcRenderer.invoke('terminal:listActive'),
+    getBuffer: (vaultId, terminalId) => ipcRenderer.invoke('terminal:getBuffer', vaultId, terminalId),
     input: (vaultId, terminalId, data) => ipcRenderer.send('terminal:input', vaultId, terminalId, data),
     resize: (vaultId, terminalId, cols, rows) => ipcRenderer.send('terminal:resize', vaultId, terminalId, cols, rows),
     kill: (vaultId, terminalId) => ipcRenderer.send('terminal:kill', vaultId, terminalId),

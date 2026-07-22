@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownDocument from './MarkdownDocument.jsx';
 import GraphView from './GraphView.jsx';
 import TerminalPanel from './TerminalPanel.jsx';
+import TerminalHoverPreview from './TerminalHoverPreview.jsx';
 
 const avatarModules = import.meta.glob('./avatars/*.png', { eager: true, import: 'default' });
 
@@ -1054,7 +1055,7 @@ function OptionsModal({ currentRoot, terminalButtons, onClose, onSaved }) {
 }
 
 function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
-  const [customInput, setCustomInput] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const vaultName = vault?.name || session.vaultId;
   const termName = term?.label || session.terminalId;
@@ -1062,7 +1063,12 @@ function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
   const handleSendText = async (text) => {
     if (!text) return;
     try {
-      await window.electronAPI.terminal.input(session.vaultId, session.terminalId, `${text}\r`);
+      // Send text first
+      await window.electronAPI.terminal.input(session.vaultId, session.terminalId, text);
+      // Wait 50ms to let characters register
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Send the Enter key (\r)
+      await window.electronAPI.terminal.input(session.vaultId, session.terminalId, '\r');
       onToast(`Envoyé à ${vaultName} (${termName}) : "${text}"`);
     } catch (err) {
       onToast(`Erreur: ${err.message}`);
@@ -1080,77 +1086,75 @@ function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
   };
 
   return (
-    <div className="supervisor-card">
-      <div className="supervisor-card-info">
+    <div className={`supervisor-card ${isExpanded ? 'is-expanded' : ''}`}>
+      <div className="supervisor-card-left" onClick={onFocus} title="Cliquer pour accéder à ce terminal">
         <div className="supervisor-avatar-wrap">
           <img src={getAvatarSrc(vault)} alt="" draggable={false} />
         </div>
         <div className="supervisor-details">
-          <strong>{termName}</strong>
-          <span>Vault : {vaultName}</span>
+          <strong>{vaultName}</strong>
+          <span>{termName}</span>
         </div>
-        <span className="supervisor-status-badge">● Actif</span>
       </div>
 
-      <div className="supervisor-card-actions">
-        <button
-          type="button"
-          className="supervisor-btn supervisor-btn--focus"
-          onClick={onFocus}
-          title="Accéder à ce terminal"
-        >
-          👁️ Aller au terminal
-        </button>
+      <div className="supervisor-card-right">
+        <div className="vigile-terminal-container">
+          <TerminalPanel
+            activeVaultId={session.vaultId}
+            terminal={{ id: session.terminalId, label: termName, command: term?.command || session.terminalId }}
+            isVisible={true}
+            minimal={true}
+            onKill={onRefresh}
+          />
+        </div>
 
-        <button
-          type="button"
-          className="supervisor-btn supervisor-btn--hello"
-          onClick={() => handleSendText('@hello.md')}
-          title="Envoyer '@hello.md' à ce terminal"
-        >
-          📄 @hello.md
-        </button>
+        <div className="supervisor-card-actions">
+          <button
+            type="button"
+            className="supervisor-btn supervisor-btn--focus"
+            onClick={onFocus}
+            title="Accéder à ce terminal"
+          >
+            👁️ Aller au terminal
+          </button>
 
-        <button
-          type="button"
-          className="supervisor-btn supervisor-btn--bye"
-          onClick={() => handleSendText('_bye')}
-          title="Envoyer '_bye' pour clôturer la session"
-        >
-          👋 _bye
-        </button>
+          <button
+            type="button"
+            className="supervisor-btn supervisor-btn--hello"
+            onClick={() => handleSendText('@hello.md')}
+            title="Envoyer '@hello.md' à ce terminal"
+          >
+            📄 @hello.md
+          </button>
 
-        <button
-          type="button"
-          className="supervisor-btn supervisor-btn--kill"
-          onClick={handleKill}
-          title="Arrêter le terminal (Kill)"
-        >
-          ☠️ Kill
-        </button>
+          <button
+            type="button"
+            className="supervisor-btn supervisor-btn--bye"
+            onClick={() => handleSendText('_bye')}
+            title="Envoyer '_bye' pour clôturer la session"
+          >
+            👋 _bye
+          </button>
+
+          <button
+            type="button"
+            className="supervisor-btn supervisor-btn--kill"
+            onClick={handleKill}
+            title="Arrêter le terminal (Kill)"
+          >
+            ☠️ Kill
+          </button>
+
+          <button
+            type="button"
+            className="supervisor-btn supervisor-btn--expand"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? "Réduire le terminal" : "Agrandir le terminal"}
+          >
+            {isExpanded ? '⤡ Réduire' : '⤢ Agrandir'}
+          </button>
+        </div>
       </div>
-
-      <form
-        className="supervisor-custom-send-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (customInput.trim()) {
-            handleSendText(customInput.trim());
-            setCustomInput('');
-          }
-        }}
-      >
-        <input
-          type="text"
-          className="supervisor-custom-input"
-          placeholder="Ex: @hello.md ou commande…"
-          value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
-        />
-        <button type="submit" className="supervisor-btn supervisor-btn--send" disabled={!customInput.trim()}>
-          Envoyer ↵
-        </button>
-      </form>
     </div>
   );
 }
@@ -1237,7 +1241,7 @@ function SupervisorModal({ vaults, terminalButtons, onClose, onSelectSession }) 
               Aucun terminal actif pour le moment.
             </div>
           ) : (
-            <div className="supervisor-list">
+            <div className={`supervisor-list ${activeSessions.length >= 3 ? 'is-grid' : ''}`}>
               {activeSessions.map((session) => (
                 <VigileCard
                   key={`${session.vaultId}-${session.terminalId}`}
@@ -1323,7 +1327,7 @@ function VigileStandalonePage() {
         ) : activeSessions.length === 0 ? (
           <div className="supervisor-empty">Aucun terminal actif pour le moment.</div>
         ) : (
-          <div className="supervisor-list">
+          <div className={`supervisor-list ${activeSessions.length >= 3 ? 'is-grid' : ''}`}>
             {activeSessions.map((session) => (
               <VigileCard
                 key={`${session.vaultId}-${session.terminalId}`}
@@ -1341,6 +1345,34 @@ function VigileStandalonePage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function TerminalTabButton({ item, activeVaultId, isActive, onClick }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      className="terminal-tab-wrapper"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button
+        type="button"
+        className={isActive ? 'is-selected' : ''}
+        onClick={onClick}
+      >
+        {item.label}
+      </button>
+      {hovered && (
+        <TerminalHoverPreview
+          vaultId={activeVaultId}
+          terminalId={item.id}
+          label={item.label}
+          command={item.command}
+        />
+      )}
     </div>
   );
 }
@@ -1614,7 +1646,16 @@ export default function App() {
             <button className={view === 'note' ? 'is-selected' : ''} onClick={() => setView('note')}>Note</button>
             <button className={view === 'graph' ? 'is-selected' : ''} onClick={() => setView('graph')}>Synapse</button>
             {terminalButtons.map((item) => (
-              <button type="button" key={item.id} className={view === 'terminal' && activeTerminalId === item.id ? 'is-selected' : ''} onClick={() => { setActiveTerminalId(item.id); setView('terminal'); }}>{item.label}</button>
+              <TerminalTabButton
+                key={item.id}
+                item={item}
+                activeVaultId={activeVaultId}
+                isActive={view === 'terminal' && activeTerminalId === item.id}
+                onClick={() => {
+                  setActiveTerminalId(item.id);
+                  setView('terminal');
+                }}
+              />
             ))}
             <button onClick={toggleAllFolders} disabled={!allFolderPaths.length}>{foldersExpanded ? 'Replier dossiers' : 'Déplier dossiers'}</button>
             <button onClick={() => refreshVaults(activeVaultId, activePath)}>Refresh</button>

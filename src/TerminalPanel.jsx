@@ -3,11 +3,11 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
-const sessionBuffers = new Map();
-const startedSessions = new Set();
-const sessionKey = (vaultId, terminalId) => `${vaultId}::${terminalId}`;
+export const sessionBuffers = new Map();
+export const startedSessions = new Set();
+export const sessionKey = (vaultId, terminalId) => `${vaultId}::${terminalId}`;
 
-export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKill }) {
+export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKill, minimal = false }) {
   const domRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
@@ -170,13 +170,15 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
   }
 
   return (
-    <div className={`terminal-panel${isVisible ? '' : ' is-hidden'}`}>
-      <div className="terminal-header">
-        <span className="terminal-title"><span className="terminal-dot" />{terminal?.label || 'Terminal'} · {activeVaultId}</span>
-        <div className="terminal-actions">
-          <button type="button" className="terminal-btn terminal-btn--kill" onClick={killCurrentTerminal} title="Arrêter et fermer ce terminal">Kill terminal</button>
+    <div className={`terminal-panel${isVisible ? '' : ' is-hidden'}${minimal ? ' terminal-panel--minimal' : ''}`}>
+      {!minimal && (
+        <div className="terminal-header">
+          <span className="terminal-title"><span className="terminal-dot" />{terminal?.label || 'Terminal'} · {activeVaultId}</span>
+          <div className="terminal-actions">
+            <button type="button" className="terminal-btn terminal-btn--kill" onClick={killCurrentTerminal} title="Arrêter et fermer ce terminal">Kill terminal</button>
+          </div>
         </div>
-      </div>
+      )}
       <div ref={domRef} className="terminal-xterm" />
     </div>
   );

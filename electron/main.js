@@ -83,6 +83,7 @@ function createVigileWindow() {
 }
 
 const ptyProcesses = new Map();
+const terminalBuffers = new Map();
 
 function getShell() {
   return process.env[process.platform === 'win32' ? 'COMSPEC' : 'SHELL'] || 'cmd.exe';
@@ -182,11 +183,24 @@ app.whenReady().then(() => {
       cwd: vaultPath,
       env,
     });
-    ptyProcess.onData((data) => mainWindow.webContents.send('terminal:data', vaultId, terminalId, data));
+    ptyProcess.onData((data) => {
+      const prev = terminalBuffers.get(key) || '';
+      terminalBuffers.set(key, (prev + data).slice(-100000));
+      BrowserWindow.getAllWindows().forEach((win) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send('terminal:data', vaultId, terminalId, data);
+        }
+      });
+    });
     ptyProcess.onExit(({ exitCode } = {}) => {
       if (ptyProcesses.get(key) === ptyProcess) {
         ptyProcesses.delete(key);
-        mainWindow.webContents.send('terminal:exit', vaultId, terminalId, exitCode);
+        terminalBuffers.delete(key);
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send('terminal:exit', vaultId, terminalId, exitCode);
+          }
+        });
       }
     });
     ptyProcesses.set(key, ptyProcess);
@@ -215,6 +229,12 @@ app.whenReady().then(() => {
     const ptyProcess = ptyProcesses.get(key);
     if (ptyProcess) ptyProcess.kill();
     ptyProcesses.delete(key);
+    terminalBuffers.delete(key);
+  });
+
+  ipcMain.handle('terminal:getBuffer', (event, vaultId, terminalId) => {
+    const key = terminalKey(vaultId, terminalId);
+    return terminalBuffers.get(key) || '';
   });
 
   ipcMain.on('vigile:open', () => {
