@@ -122,9 +122,11 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
       fitRef.current?.fit();
       if (sessionBuffers.get(key)) xtermRef.current.write(sessionBuffers.get(key));
 
-      if (!exists && !startedSessions.has(key)) {
+      if (!exists) {
         startedSessions.add(key);
-        window.electronAPI.terminal.input(vaultId, terminalId, `${terminal.command}\r`);
+        setTimeout(() => {
+          window.electronAPI.terminal.input(vaultId, terminalId, `${terminal.command}\r`);
+        }, 200);
       }
     }).catch((error) => {
       if (switchId === switchRef.current) xtermRef.current?.write(`\r\n\x1b[31m${error.message}\x1b[0m\r\n`);
@@ -161,7 +163,7 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
       observer.disconnect();
       window.removeEventListener('resize', doFit);
     };
-  }, [isVisible]);
+  }, [activeVaultId, terminal?.id, isVisible]);
 
   function killCurrentTerminal() {
     if (!activeVaultId || !terminal?.id) return;
