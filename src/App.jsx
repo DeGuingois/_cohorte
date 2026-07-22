@@ -46,7 +46,7 @@ function getAvatarSrc(vault) {
 }
 
 const VAULT_ORDER_KEY = 'vault-order';
-const DEFAULT_TERMINAL_BUTTONS = [{ id: 'codex', label: 'Codex', command: 'codex' }, { id: 'gemini', label: 'Gemini', command: 'agy' }];
+const DEFAULT_TERMINAL_BUTTONS = [{ id: 'codex', label: 'Codex', command: 'codex --no-alt-screen' }, { id: 'gemini', label: 'Gemini', command: 'agy' }];
 
 function readStoredVaultOrder() {
   try {

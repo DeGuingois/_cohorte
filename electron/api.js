@@ -5,7 +5,7 @@ import { buildGraphData } from '../src/graphData.js';
 const SETTINGS_FILE = path.resolve('./settings.json');
 const DEFAULT_VAULTS_ROOT = process.env.VAULTS_ROOT || 'C:\\Users\\s.travers\\Documents\\_projet_perso\\agents_vaults';
 const DEFAULT_TERMINAL_BUTTONS = [
-  { id: 'codex', label: 'Codex', command: 'codex' },
+  { id: 'codex', label: 'Codex', command: 'codex --no-alt-screen' },
   { id: 'gemini', label: 'Gemini', command: 'agy' },
 ];
 
