@@ -13,6 +13,7 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
   const fitRef = useRef(null);
   const activeSessionRef = useRef({ vaultId: '', terminalId: '', key: '' });
   const switchRef = useRef(0);
+  const lastSizeRef = useRef({ cols: 0, rows: 0 });
 
   useEffect(() => {
     if (!xtermRef.current) {
@@ -110,6 +111,7 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
     const key = sessionKey(vaultId, terminalId);
     const switchId = ++switchRef.current;
     activeSessionRef.current = { vaultId, terminalId, key };
+    lastSizeRef.current = { cols: 0, rows: 0 };
     xtermRef.current.reset();
     fitRef.current?.fit();
     const dims = fitRef.current?.proposeDimensions() || { cols: 80, rows: 30 };
@@ -142,7 +144,10 @@ export default function TerminalPanel({ activeVaultId, terminal, isVisible, onKi
         const { cols, rows } = xtermRef.current || {};
         const { vaultId, terminalId } = activeSessionRef.current;
         if (vaultId && terminalId && cols && rows) {
-          window.electronAPI.terminal.resize(vaultId, terminalId, cols, rows);
+          if (cols !== lastSizeRef.current.cols || rows !== lastSizeRef.current.rows) {
+            lastSizeRef.current = { cols, rows };
+            window.electronAPI.terminal.resize(vaultId, terminalId, cols, rows);
+          }
         }
       } catch { /* ignore */ }
     };
