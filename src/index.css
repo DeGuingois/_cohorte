@@ -2775,20 +2775,50 @@ button {
 }
 
 .supervisor-card-left {
-  flex: 0 0 130px;
+  flex: 0 0 135px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px;
+  gap: 12px;
+  padding: 10px 8px;
   border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.supervisor-card-left-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
   transition: background-color 0.15s ease;
 }
 
-.supervisor-card-left:hover {
-  background: rgba(239, 68, 68, 0.04);
+.supervisor-card-left-info:hover {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.supervisor-card-left .supervisor-card-actions {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding-top: 10px;
+  margin-top: auto;
+}
+
+.supervisor-card-left .supervisor-card-actions .supervisor-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  font-size: 10px;
+  padding: 4px 8px;
 }
 
 .supervisor-card-right {
@@ -2865,8 +2895,8 @@ button {
 }
 
 .supervisor-avatar-wrap {
-  width: 48px;
-  height: 48px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid var(--theme-primary);
@@ -2875,7 +2905,7 @@ button {
   transition: transform 0.15s ease;
 }
 
-.supervisor-card-left:hover .supervisor-avatar-wrap {
+.supervisor-card-left-info:hover .supervisor-avatar-wrap {
   transform: scale(1.05);
 }
 

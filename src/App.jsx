@@ -1072,25 +1072,15 @@ function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
 
   return (
     <div className={`supervisor-card ${isExpanded ? 'is-expanded' : ''}`}>
-      <div className="supervisor-card-left" onClick={onFocus} title="Cliquer pour accéder à ce terminal">
-        <div className="supervisor-avatar-wrap">
-          <img src={getAvatarSrc(vault)} alt="" draggable={false} />
-        </div>
-        <div className="supervisor-details">
-          <strong>{vaultName}</strong>
-          <span>{termName}</span>
-        </div>
-      </div>
-
-      <div className="supervisor-card-right">
-        <div className="vigile-terminal-container">
-          <TerminalPanel
-            activeVaultId={session.vaultId}
-            terminal={{ id: session.terminalId, label: termName, command: term?.command || session.terminalId }}
-            isVisible={true}
-            minimal={true}
-            onKill={onRefresh}
-          />
+      <div className="supervisor-card-left">
+        <div className="supervisor-card-left-info" onClick={onFocus} title="Cliquer pour accéder à ce terminal">
+          <div className="supervisor-avatar-wrap">
+            <img src={getAvatarSrc(vault)} alt="" draggable={false} />
+          </div>
+          <div className="supervisor-details">
+            <strong>{vaultName}</strong>
+            <span>{termName}</span>
+          </div>
         </div>
 
         <div className="supervisor-card-actions">
@@ -1120,6 +1110,18 @@ function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
           >
             {isExpanded ? '⤡ Réduire' : '⤢ Agrandir'}
           </button>
+        </div>
+      </div>
+
+      <div className="supervisor-card-right">
+        <div className="vigile-terminal-container">
+          <TerminalPanel
+            activeVaultId={session.vaultId}
+            terminal={{ id: session.terminalId, label: termName, command: term?.command || session.terminalId }}
+            isVisible={true}
+            minimal={true}
+            onKill={onRefresh}
+          />
         </div>
       </div>
     </div>
