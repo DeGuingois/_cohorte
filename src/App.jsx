@@ -1060,21 +1060,6 @@ function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
   const vaultName = vault?.name || session.vaultId;
   const termName = term?.label || session.terminalId;
 
-  const handleSendText = async (text) => {
-    if (!text) return;
-    try {
-      // Send text first
-      await window.electronAPI.terminal.input(session.vaultId, session.terminalId, text);
-      // Wait 50ms to let characters register
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      // Send the Enter key (\r)
-      await window.electronAPI.terminal.input(session.vaultId, session.terminalId, '\r');
-      onToast(`Envoyé à ${vaultName} (${termName}) : "${text}"`);
-    } catch (err) {
-      onToast(`Erreur: ${err.message}`);
-    }
-  };
-
   const handleKill = async () => {
     try {
       await window.electronAPI.terminal.kill(session.vaultId, session.terminalId);
@@ -1116,24 +1101,6 @@ function VigileCard({ session, vault, term, onFocus, onToast, onRefresh }) {
             title="Accéder à ce terminal"
           >
             👁️ Aller au terminal
-          </button>
-
-          <button
-            type="button"
-            className="supervisor-btn supervisor-btn--hello"
-            onClick={() => handleSendText('@hello.md')}
-            title="Envoyer '@hello.md' à ce terminal"
-          >
-            📄 @hello.md
-          </button>
-
-          <button
-            type="button"
-            className="supervisor-btn supervisor-btn--bye"
-            onClick={() => handleSendText('_bye')}
-            title="Envoyer '_bye' pour clôturer la session"
-          >
-            👋 _bye
           </button>
 
           <button
